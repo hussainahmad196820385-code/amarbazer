@@ -1,0 +1,54 @@
+{
+  "name": "AmarBazar BD - Digital Marketplace & ERP",
+  "short_name": "AmarBazar",
+  "description": "Comprehensive Bangladeshi Digital Marketplace featuring Customer, Seller, and Admin panels with bKash/Nagad payments, live courier tracking, and bilingual support.",
+  "start_url": "/",
+  "id": "com.amarbazar.app",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "lang": "bn",
+  "dir": "ltr",
+  "categories": ["shopping", "business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Storefront / কেনাকাটা",
+      "short_name": "Shop",
+      "url": "/?panel=customer",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Track Order / অর্ডার ট্র্যাক",
+      "short_name": "Track",
+      "url": "/?panel=store_directory",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Seller Panel / বিক্রেতা প্যানেল",
+      "short_name": "Seller",
+      "url": "/?panel=seller",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

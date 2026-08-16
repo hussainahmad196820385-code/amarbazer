@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AmarBazar BD</string>
+    <string name="title_activity_main">AmarBazar BD</string>
+    <string name="package_name">com.amarbazar.app</string>
+    <string name="custom_url_scheme">com.amarbazar.app</string>
+</resources>

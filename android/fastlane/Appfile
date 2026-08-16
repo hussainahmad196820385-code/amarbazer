@@ -1,0 +1,7 @@
+# Appfile for Fastlane Supply / Google Play Configuration
+
+# Path to the Google Play Developer API Service Account JSON key
+json_key_file("android/play-service-account.json")
+
+# Your Android Application Package Name
+package_name("com.amarbazarbd.app")

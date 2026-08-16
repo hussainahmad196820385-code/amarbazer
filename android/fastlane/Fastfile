@@ -1,0 +1,55 @@
+# Fastlane Fastfile for AmarBazar BD Android App Deployment
+
+default_platform(:android)
+
+platform :android do
+  desc "Runs linter and unit tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Build Android App Bundle (.aab) with Release Signing"
+  lane :build_bundle do
+    # Fetch Keystore & Signing credentials from GitHub Secrets / Env Vars
+    keystore_path = ENV['KEYSTORE_PATH'] || "release.keystore"
+    keystore_pass = ENV['KEYSTORE_PASSWORD']
+    key_alias = ENV['KEY_ALIAS']
+    key_pass = ENV['KEY_PASSWORD']
+
+    gradle(
+      task: "bundle",
+      build_type: "Release",
+      properties: {
+        "android.injected.signing.store.file" => keystore_path,
+        "android.injected.signing.store.password" => keystore_pass,
+        "android.injected.signing.key.alias" => key_alias,
+        "android.injected.signing.key.password" => key_pass
+      }
+    )
+  end
+
+  desc "Build Signed AAB and Publish directly to Google Play Store"
+  lane :deploy_playstore do
+    # 1. Build Signed .AAB bundle
+    build_bundle
+
+    # 2. Upload to Google Play Console via Fastlane Supply
+    # Available Tracks: 'internal', 'alpha', 'beta', 'production'
+    track_type = ENV['TRACK'] || "internal"
+    package_name = ENV['ANDROID_PACKAGE_NAME'] || "com.amarbazarbd.app"
+    json_key_file = ENV['SUPPLY_JSON_KEY'] || "play-service-account.json"
+
+    upload_to_play_store(
+      package_name: package_name,
+      track: track_type,
+      aab: "app/build/outputs/bundle/release/app-release.aab",
+      json_key: json_key_file,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      release_status: "completed"
+    )
+    
+    UI.success("🚀 Successfully built and uploaded #{package_name} to Google Play Store (#{track_type} track)!")
+  end
+end
