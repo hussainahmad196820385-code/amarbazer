@@ -13,7 +13,7 @@ import { BiometricAuthModal } from './BiometricAuthModal';
 import { getSavedBiometricUser, isBiometricEnabled } from '../../services/biometricAuth';
 
 export const AuthModal: React.FC = () => {
-  const { isAuthOpen, setIsAuthOpen, setCurrentUser, language, setActivePanel, setActiveRole, activePanel, activeRole } = useApp();
+  const { isAuthOpen, setIsAuthOpen, setCurrentUser, language, setActivePanel, setActiveRole, activePanel, activeRole, setIsCustomerOnlyMode } = useApp();
 
   const isSellerView = activePanel === 'seller' || activePanel === 'inventory_workspace' || activePanel === 'register_vendor' || activeRole === 'seller';
 
@@ -280,10 +280,27 @@ export const AuthModal: React.FC = () => {
   const handleUsernamePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
-    const u = username.trim();
-    const p = password.trim();
+    // Normalize Bengali digits (০-৯) to English digits (0-9)
+    const bnToEnMap: Record<string, string> = {
+      '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+      '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
+    };
+    const cleanStr = (s?: string) => (s || '').trim().replace(/[০-৯]/g, m => bnToEnMap[m] || m);
+
+    const u = cleanStr(username);
+    const p = cleanStr(password);
+
+    if (!u) {
+      setError(language === 'bn' ? 'দয়া করে ইউজারনেম লিখুন (যেমন: admin)' : 'Please enter your username (e.g. admin)');
+      return;
+    }
+    if (!p) {
+      setError(language === 'bn' ? 'দয়া করে পাসওয়ার্ড লিখুন' : 'Please enter your password');
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       const loginRes = await api.login({ username: u, password: p, email: u, phone: u });
@@ -293,8 +310,10 @@ export const AuthModal: React.FC = () => {
         setActiveRole(loggedUser.role);
         
         if (loggedUser.role === 'admin' || loggedUser.isAdminStaff || loggedUser.role === 'system_admin' || loggedUser.role === 'manager') {
+          setIsCustomerOnlyMode(false);
           setActivePanel('admin');
         } else if (loggedUser.role === 'seller') {
+          setIsCustomerOnlyMode(false);
           setActivePanel('seller');
         } else {
           setActivePanel('customer');
@@ -847,6 +866,58 @@ export const AuthModal: React.FC = () => {
                     </form>
                   ) : (
                     <div className="space-y-4">
+                      {/* Quick Role Fill Chips */}
+                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsername('admin');
+                            setPassword('hussain3122');
+                            setError('');
+                          }}
+                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            username.toLowerCase() === 'admin'
+                              ? 'bg-[#da1c24] text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>👑</span>
+                          <span>{language === 'bn' ? 'এডমিন' : 'Admin'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsername('seller');
+                            setPassword('seller123');
+                            setError('');
+                          }}
+                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            username.toLowerCase() === 'seller'
+                              ? 'bg-[#da1c24] text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>🏪</span>
+                          <span>{language === 'bn' ? 'সেলার' : 'Seller'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsername('customer');
+                            setPassword('customer123');
+                            setError('');
+                          }}
+                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            username.toLowerCase() === 'customer'
+                              ? 'bg-[#da1c24] text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>🛍️</span>
+                          <span>{language === 'bn' ? 'কাস্টমার' : 'Customer'}</span>
+                        </button>
+                      </div>
+
                       <form onSubmit={handleUsernamePasswordSubmit} className="space-y-4">
                         {/* Username */}
                         <div className="space-y-1.5">
@@ -861,7 +932,7 @@ export const AuthModal: React.FC = () => {
                               type="text"
                               value={username}
                               onChange={(e) => setUsername(e.target.value)}
-                              placeholder={language === 'bn' ? 'যেমন: admin, seller, customer' : 'e.g. admin, seller, customer'}
+                              placeholder={language === 'bn' ? 'যেমন: admin' : 'e.g. admin'}
                               className="flex-1 px-3.5 py-3 text-sm font-bold bg-transparent focus:outline-none text-slate-800 dark:text-white placeholder-slate-400"
                               required
                               autoFocus
