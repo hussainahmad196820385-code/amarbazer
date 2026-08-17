@@ -236,6 +236,47 @@ export const supabaseDb = {
     } catch (err) {
       return null;
     }
+  },
+
+  // REALTIME SUBSCRIPTIONS
+  subscribeToProducts(onChange: () => void): () => void {
+    const sb = getSupabase();
+    if (!sb) return () => {};
+    try {
+      const channel = sb
+        .channel('realtime-products')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+          onChange();
+        })
+        .subscribe();
+
+      return () => {
+        sb.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('Realtime product subscription failed:', err);
+      return () => {};
+    }
+  },
+
+  subscribeToOrders(onChange: () => void): () => void {
+    const sb = getSupabase();
+    if (!sb) return () => {};
+    try {
+      const channel = sb
+        .channel('realtime-orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          onChange();
+        })
+        .subscribe();
+
+      return () => {
+        sb.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('Realtime orders subscription failed:', err);
+      return () => {};
+    }
   }
 };
 

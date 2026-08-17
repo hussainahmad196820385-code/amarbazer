@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { User, Product, Category, CartItem, Order, Language, CurrencyCode, Role, SystemSettings, Notification, ColorPalette, getProductUnitPrice, getBulkDiscountedPrice } from '../types';
 import { INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SYSTEM_SETTINGS } from '../data/initialData';
 import { api } from '../services/api';
+import { supabaseDb } from '../lib/supabase';
 import { applyLiveLanguage } from '../services/languageService';
 import { applyLiveCurrency, formatCurrencyAmount } from '../services/currencyService';
 
@@ -691,6 +692,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshProducts();
     refreshCategories();
     refreshSystemSettings();
+
+    // 1. Supabase Realtime Subscription
+    const unsubProducts = supabaseDb.subscribeToProducts(() => {
+      refreshProducts();
+    });
+
+    // 2. Periodic sync (every 8 seconds) so updates from any phone/device sync everywhere
+    const interval = setInterval(() => {
+      refreshProducts();
+    }, 8000);
+
+    // 3. Sync on tab focus or visibility change
+    const handleFocus = () => {
+      refreshProducts();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      unsubProducts();
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, []);
 
   const prevUserRef = useRef<User | null>(currentUser);
