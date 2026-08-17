@@ -577,12 +577,31 @@ export const ProductApprovals: React.FC = () => {
                     )}
 
                     {activeTab === 'approved' && (
+                      <>
+                        <button
+                          onClick={() => triggerRejectProduct(product)}
+                          className="flex-1 py-1.5 border border-rose-200 text-rose-600 dark:border-rose-950/30 dark:text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-1"
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          {language === 'bn' ? 'স্থগিত করুন' : 'Suspend'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(product.id, product.title)}
+                          className="p-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-bold transition duration-200"
+                          title={language === 'bn' ? 'স্থায়ীভাবে ডিলিট করুন' : 'Permanently Delete'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+
+                    {activeTab === 'pending' && (
                       <button
-                        onClick={() => triggerRejectProduct(product)}
-                        className="flex-1 py-1.5 border border-rose-200 text-rose-600 dark:border-rose-950/30 dark:text-rose-400 hover:bg-rose-500 hover:text-white rounded-lg text-xs font-bold transition duration-200 flex items-center justify-center gap-1"
+                        onClick={() => handleDeleteProduct(product.id, product.title)}
+                        className="p-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-bold transition duration-200"
+                        title={language === 'bn' ? 'স্থায়ীভাবে ডিলিট করুন' : 'Permanently Delete'}
                       >
-                        <ShieldAlert className="w-3.5 h-3.5" />
-                        {language === 'bn' ? 'স্থগিত করুন' : 'Suspend Live'}
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
 
@@ -598,7 +617,8 @@ export const ProductApprovals: React.FC = () => {
 
                         <button
                           onClick={() => handleDeleteProduct(product.id, product.title)}
-                          className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-bold transition duration-200"
+                          className="p-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-bold transition duration-200"
+                          title={language === 'bn' ? 'স্থায়ীভাবে ডিলিট করুন' : 'Permanently Delete'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -770,6 +790,14 @@ export const ProductApprovals: React.FC = () => {
                 {language === 'bn' ? 'বন্ধ করুন' : 'Close'}
               </button>
               
+              <button
+                onClick={() => handleDeleteProduct(selectedProduct.id, selectedProduct.title)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {language === 'bn' ? 'স্থায়ীভাবে ডিলিট করুন' : 'Delete Product'}
+              </button>
+
               <button
                 onClick={() => handleOpenEdit(selectedProduct)}
                 className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-amber-500 font-bold hover:bg-amber-500/10 rounded-xl text-xs transition"

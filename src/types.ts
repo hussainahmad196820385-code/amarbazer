@@ -163,6 +163,14 @@ export interface Product {
   variantPrices?: Record<string, number | VariantPriceDetails>;
   bulkOffers?: BulkOffer[];
   warranty?: string;
+  warrantyPolicy?: string;
+  returnPolicy?: string;
+  deliveryTime?: string;
+  isFreeDelivery?: boolean;
+  deliveryChargeInside?: number;
+  deliveryChargeOutside?: number;
+  isCodAvailable?: boolean;
+  isExpressDelivery?: boolean;
   customSpecs?: { label: string; labelBn?: string; value: string; valueBn?: string }[];
   createdAt: string;
 }

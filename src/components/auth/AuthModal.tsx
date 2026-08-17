@@ -866,63 +866,11 @@ export const AuthModal: React.FC = () => {
                     </form>
                   ) : (
                     <div className="space-y-4">
-                      {/* Quick Role Fill Chips */}
-                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUsername('admin');
-                            setPassword('hussain3122');
-                            setError('');
-                          }}
-                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                            username.toLowerCase() === 'admin'
-                              ? 'bg-[#da1c24] text-white shadow-xs'
-                              : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800'
-                          }`}
-                        >
-                          <span>👑</span>
-                          <span>{language === 'bn' ? 'এডমিন' : 'Admin'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUsername('seller');
-                            setPassword('seller123');
-                            setError('');
-                          }}
-                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                            username.toLowerCase() === 'seller'
-                              ? 'bg-[#da1c24] text-white shadow-xs'
-                              : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800'
-                          }`}
-                        >
-                          <span>🏪</span>
-                          <span>{language === 'bn' ? 'সেলার' : 'Seller'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUsername('customer');
-                            setPassword('customer123');
-                            setError('');
-                          }}
-                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                            username.toLowerCase() === 'customer'
-                              ? 'bg-[#da1c24] text-white shadow-xs'
-                              : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800'
-                          }`}
-                        >
-                          <span>🛍️</span>
-                          <span>{language === 'bn' ? 'কাস্টমার' : 'Customer'}</span>
-                        </button>
-                      </div>
-
                       <form onSubmit={handleUsernamePasswordSubmit} className="space-y-4">
                         {/* Username */}
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest block">
-                            {language === 'bn' ? 'ইউজারনেম' : 'Username'} <span className="text-red-500">*</span>
+                            {language === 'bn' ? 'ইউজারনেম / ইমেইল / ফোন নম্বর' : 'Username / Email / Phone'} <span className="text-red-500">*</span>
                           </label>
                           <div className="flex items-center border rounded-xl overflow-hidden bg-slate-50/80 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#da1c24] transition-all duration-200">
                             <div className="px-3.5 text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/80 py-3">
@@ -932,7 +880,7 @@ export const AuthModal: React.FC = () => {
                               type="text"
                               value={username}
                               onChange={(e) => setUsername(e.target.value)}
-                              placeholder={language === 'bn' ? 'যেমন: admin' : 'e.g. admin'}
+                              placeholder={language === 'bn' ? 'ইউজারনেম লিখুন (যেমন: admin বা seller)' : 'Enter username, email or phone'}
                               className="flex-1 px-3.5 py-3 text-sm font-bold bg-transparent focus:outline-none text-slate-800 dark:text-white placeholder-slate-400"
                               required
                               autoFocus

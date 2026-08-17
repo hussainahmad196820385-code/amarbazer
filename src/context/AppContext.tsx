@@ -69,9 +69,11 @@ interface AppContextType {
   activeCampaignTab: string;
   setActiveCampaignTab: (tab: string) => void;
   
-  // Data Refresh
+  // Data Refresh & Mutation
   refreshProducts: () => Promise<void>;
   refreshCategories: () => Promise<void>;
+  deleteProduct: (id: string) => Promise<boolean>;
+  createProduct: (product: Partial<Product>) => Promise<Product>;
   
   // Dedicated customer-only marketplace mode
   isCustomerOnlyMode: boolean;
@@ -631,6 +633,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const deleteProduct = async (id: string): Promise<boolean> => {
+    // 1. Instantly remove from React memory state
+    setProducts(prev => prev.filter(p => p.id !== id));
+    // 2. Persist in api / local storage / backend
+    try {
+      await api.deleteProduct(id);
+      await refreshProducts();
+      return true;
+    } catch (err) {
+      console.warn('Error deleting product:', err);
+      return false;
+    }
+  };
+
+  const createProduct = async (productData: Partial<Product>): Promise<Product> => {
+    try {
+      const created = await api.createProduct(productData);
+      setProducts(prev => [created, ...prev.filter(p => p.id !== created.id)]);
+      await refreshProducts();
+      return created;
+    } catch (err) {
+      console.error('Error creating product:', err);
+      throw err;
+    }
+  };
+
   const refreshCategories = async () => {
     try {
       const data = await api.getCategories();
@@ -826,6 +854,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCampaignTab,
       refreshProducts,
       refreshCategories,
+      deleteProduct,
+      createProduct,
       isCustomerOnlyMode,
       setIsCustomerOnlyMode,
       isMobileChatActive,

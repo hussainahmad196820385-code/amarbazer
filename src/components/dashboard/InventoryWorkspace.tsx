@@ -1063,8 +1063,8 @@ export const InventoryWorkspace: React.FC = () => {
       }
 
       const payload = {
-        title: builderTitle,
-        titleBn: builderTitleBn || builderTitle,
+        title: builderTitle.trim(),
+        titleBn: (builderTitleBn || builderTitle).trim(),
         price: Number(builderPrice) || 100,
         discountPrice: builderDiscount ? Number(builderDiscount) : undefined,
         stock: Number(builderStock) || 0,
@@ -1073,8 +1073,8 @@ export const InventoryWorkspace: React.FC = () => {
         brand: builderBrand || 'Local Store',
         description: finalDesc,
         descriptionBn: finalDescBn,
-        sellerId: 'sel-1',
-        sellerName: 'AmarBazar Official Mall',
+        sellerId: currentUser?.id || 'sel-1',
+        sellerName: (currentUser as any)?.storeName || currentUser?.name || 'AmarBazar Official Mall',
         images: customImageUrls.length > 0 ? customImageUrls : [activeImageUrl],
         sku: builderSku,
         warranty: warrantyPolicy || builderWarranty,
@@ -1104,9 +1104,11 @@ export const InventoryWorkspace: React.FC = () => {
       // Automatically go to public customer view and select the product
       setSelectedProduct(newProduct);
       setActivePanel('customer');
-    } catch (err) {
-      console.error(err);
-      alert('Error publishing product. Please check the inputs.');
+    } catch (err: any) {
+      console.error('Error publishing product:', err);
+      alert(language === 'bn' 
+        ? 'পণ্য তালিকাভুক্ত করার সময় সমস্যা হয়েছে। অনুগ্রহ করে ইনপুট চেক করুন।' 
+        : 'Error publishing product. Please check the inputs.');
     }
   };
 
