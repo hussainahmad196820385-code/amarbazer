@@ -77,8 +77,8 @@ export const AuthModal: React.FC = () => {
       setSignupName('');
       setSignupEmail('');
       setSignupType('customer');
-      setUsername('customer');
-      setPassword('customer123');
+      setUsername('');
+      setPassword('');
       setSelectedRole('customer');
       setStoreName('');
       setOwnerFirstName('');

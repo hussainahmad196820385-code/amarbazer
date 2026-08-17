@@ -393,23 +393,32 @@ export async function authenticateWithBiometrics(
       navigator.vibrate([50, 40, 60]);
     }
 
-    // Form user object based on saved biometric profile or selected role
-    const effectiveRole = (targetRole as any) || savedBioUser.userRole || 'customer';
-    
+    // Form user object based strictly on the registered biometric user profile
+    const registeredRole = savedBioUser.userRole || 'customer';
+
+    // Strict security check: If user requested admin login or enrolled user is not admin
+    if (targetRole === 'admin' && registeredRole !== 'admin') {
+      return {
+        success: false,
+        message: 'নিরাপত্তার স্বার্থে এডমিন প্যানেলে ইউজারনেম (admin) ও পাসওয়ার্ড দিয়ে লগইন করতে হবে।'
+      };
+    }
+
     let authenticatedUser: any;
-    if (effectiveRole === 'admin') {
+    if (registeredRole === 'admin') {
       authenticatedUser = {
-        id: 'usr-admin-1',
-        name: savedBioUser.userName || 'Master Admin',
-        email: savedBioUser.userEmail || 'admin@amarbazar.bd',
+        id: savedBioUser.userId || 'usr-admin-1',
+        name: savedBioUser.userName || 'Super Admin BD',
+        username: 'admin',
+        email: savedBioUser.userEmail || 'admin@amarbazar.com.bd',
         phone: savedBioUser.userPhone || '01800000000',
         role: 'admin',
         isVerified: true,
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
         addresses: [],
-        createdAt: '2025-01-01T00:00:00Z'
+        createdAt: '2024-01-01T00:00:00Z'
       };
-    } else if (effectiveRole === 'seller') {
+    } else if (registeredRole === 'seller') {
       authenticatedUser = {
         id: savedBioUser.userId || 'usr-seller-1',
         name: savedBioUser.userName || 'Tanvir Hossain (Dhaka Tech)',

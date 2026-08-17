@@ -512,8 +512,45 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
         if (p.categoryId === selectedCategory) return true;
 
         // Custom child/grandchild matching to make it look 100% functional
-        const nameLower = (p.title + ' ' + (p.titleBn || '') + ' ' + p.brand).toLowerCase();
+        const nameLower = (p.title + ' ' + (p.titleBn || '') + ' ' + (p.categoryName || '') + ' ' + (p.subCategory || '') + ' ' + p.brand).toLowerCase();
+        const tagsLower = (p.tags || []).map(t => t.toLowerCase()).join(' ');
 
+        if (selectedCategory === 'combo-deals' || selectedCategory === 'combo-package-builder') {
+          return p.categoryId === 'combo-deals' || 
+                 tagsLower.includes('combo') || tagsLower.includes('package') || tagsLower.includes('bundle') || tagsLower.includes('deal') ||
+                 nameLower.includes('combo') || nameLower.includes('package') || nameLower.includes('bundle') || nameLower.includes('কম্বো') || nameLower.includes('প্যাকেজ') || nameLower.includes('অফার') || nameLower.includes('প্যাক') || nameLower.includes('duo');
+        }
+        if (selectedCategory === 'fast-food') {
+          return p.categoryId === 'fast-food' ||
+                 tagsLower.includes('fast food') || tagsLower.includes('burger') || tagsLower.includes('wings') || tagsLower.includes('fries') ||
+                 nameLower.includes('burger') || nameLower.includes('fast food') || nameLower.includes('fried chicken') || nameLower.includes('wings') || nameLower.includes('french fries') || nameLower.includes('বার্গার') || nameLower.includes('ফাস্টফুড') || nameLower.includes('ফ্রাই');
+        }
+        if (selectedCategory === 'pizza-pasta') {
+          return p.categoryId === 'pizza-pasta' ||
+                 tagsLower.includes('pizza') || tagsLower.includes('pasta') ||
+                 nameLower.includes('pizza') || nameLower.includes('pasta') || nameLower.includes('spaghetti') || nameLower.includes('alfredo') || nameLower.includes('পিজ্জা') || nameLower.includes('পাস্তা');
+        }
+        if (selectedCategory === 'cakes-pastry') {
+          return p.categoryId === 'cakes-pastry' ||
+                 tagsLower.includes('cake') || tagsLower.includes('pastry') || tagsLower.includes('bakery') ||
+                 nameLower.includes('cake') || nameLower.includes('pastry') || nameLower.includes('cupcake') || nameLower.includes('birthday cake') || nameLower.includes('কেক') || nameLower.includes('পেস্ট্রি');
+        }
+        if (selectedCategory === 'sweets-desserts') {
+          return p.categoryId === 'sweets-desserts' ||
+                 tagsLower.includes('sweet') || tagsLower.includes('misti') || tagsLower.includes('dessert') ||
+                 nameLower.includes('sweet') || nameLower.includes('misti') || nameLower.includes('chomchom') || nameLower.includes('rosogolla') || nameLower.includes('laddu') || nameLower.includes('barfi') || nameLower.includes('মিষ্টি') || nameLower.includes('চমচম') || nameLower.includes('রসগোল্লা') || nameLower.includes('লাড্ডু');
+        }
+        if (selectedCategory === 'restaurant-meals') {
+          return p.categoryId === 'restaurant-meals' ||
+                 tagsLower.includes('biryani') || tagsLower.includes('kacchi') || tagsLower.includes('restaurant') || tagsLower.includes('meal') ||
+                 nameLower.includes('biryani') || nameLower.includes('kacchi') || nameLower.includes('khichuri') || nameLower.includes('platter') || nameLower.includes('kebab') || nameLower.includes('বিরিয়ানি') || nameLower.includes('কাচ্চি') || nameLower.includes('খিচুড়ি') || nameLower.includes('খাবার');
+        }
+        if (selectedCategory === 'ice-cream') {
+          return tagsLower.includes('ice cream') || nameLower.includes('ice cream') || nameLower.includes('icecream') || nameLower.includes('kulfi') || nameLower.includes('আইসক্রিম') || nameLower.includes('কুলফি');
+        }
+        if (selectedCategory === 'chocolates-candy') {
+          return tagsLower.includes('chocolate') || tagsLower.includes('candy') || nameLower.includes('chocolate') || nameLower.includes('candy') || nameLower.includes('চকলেট') || nameLower.includes('ক্যান্ডি');
+        }
         if (selectedCategory === 'fruits-veg') {
           return p.categoryId === 'cat-3' && (
             p.tags?.some(t => t.toLowerCase().includes('fruit') || t.toLowerCase().includes('vegetable') || t.toLowerCase().includes('fresh')) ||
@@ -559,14 +596,14 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
         if (selectedCategory === 'eggs') {
           return p.categoryId === 'cat-3' && (nameLower.includes('egg') || nameLower.includes('ডিম'));
         }
-        if (selectedCategory === 'baby-food') {
-          return p.categoryId === 'cat-3' && (nameLower.includes('baby') || nameLower.includes('cerelac') || nameLower.includes('nestle') || nameLower.includes('দুধ') || nameLower.includes('lactogen'));
+        if (selectedCategory === 'baby-food' || selectedCategory === 'baby-care') {
+          return (p.categoryId === 'cat-3' || p.categoryId === 'baby-food' || p.categoryId === 'cat-10') && (nameLower.includes('baby') || nameLower.includes('cerelac') || nameLower.includes('nestle') || nameLower.includes('দুধ') || nameLower.includes('lactogen') || nameLower.includes('diaper') || nameLower.includes('ডায়াপার'));
         }
         if (selectedCategory === 'diapers') {
           return nameLower.includes('diaper') || nameLower.includes('pampers') || nameLower.includes('ডায়াপার');
         }
         if (selectedCategory === 'home-cleaning') {
-          return p.categoryId === 'cat-4' && (
+          return (p.categoryId === 'cat-4' || p.categoryId === 'home-cleaning') && (
             nameLower.includes('clean') || nameLower.includes('wash') || nameLower.includes('detergent') ||
             nameLower.includes('surf excel') || nameLower.includes('soap') || nameLower.includes('lux') ||
             nameLower.includes('পরিষ্কার')
@@ -575,11 +612,11 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
         if (selectedCategory === 'pet-care') {
           return nameLower.includes('pet') || nameLower.includes('dog') || nameLower.includes('cat') || nameLower.includes('whiskas') || nameLower.includes('খাবার');
         }
-        if (selectedCategory === 'stationeries') {
-          return nameLower.includes('pen') || nameLower.includes('notebook') || nameLower.includes('pencil') || nameLower.includes('paper') || nameLower.includes('খাতা') || nameLower.includes('কলম');
+        if (selectedCategory === 'stationeries' || selectedCategory === 'cat-12') {
+          return p.categoryId === 'cat-12' || nameLower.includes('pen') || nameLower.includes('notebook') || nameLower.includes('pencil') || nameLower.includes('paper') || nameLower.includes('book') || nameLower.includes('বই') || nameLower.includes('খাতা') || nameLower.includes('কলম');
         }
-        if (selectedCategory === 'toys-sports') {
-          return nameLower.includes('toy') || nameLower.includes('ball') || nameLower.includes('cricket') || nameLower.includes('football') || nameLower.includes('খেলনা');
+        if (selectedCategory === 'toys-sports' || selectedCategory === 'cat-10') {
+          return p.categoryId === 'cat-10' || nameLower.includes('toy') || nameLower.includes('ball') || nameLower.includes('cricket') || nameLower.includes('football') || nameLower.includes('খেলনা');
         }
         if (selectedCategory === 'dry-fruits-nuts') {
           return p.categoryId === 'cat-3' && (nameLower.includes('nuts') || nameLower.includes('বাদাম') || nameLower.includes('cashew') || nameLower.includes('almond') || nameLower.includes('কাঠবাদাম'));
@@ -612,13 +649,13 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
           return p.categoryId === 'cat-3' && (nameLower.includes('juice') || nameLower.includes('drink') || nameLower.includes('water') || nameLower.includes('soda') || nameLower.includes('কোকা') || nameLower.includes('পানি') || nameLower.includes('জুস'));
         }
         if (selectedCategory === 'bakery') {
-          return p.categoryId === 'cat-3' && (nameLower.includes('bread') || nameLower.includes('cake') || nameLower.includes('bun') || nameLower.includes('কেক') || nameLower.includes('পাউরুটি'));
+          return (p.categoryId === 'cat-3' || p.categoryId === 'cakes-pastry') && (nameLower.includes('bread') || nameLower.includes('cake') || nameLower.includes('bun') || nameLower.includes('কেক') || nameLower.includes('পাউরুটি'));
         }
         if (selectedCategory === 'frozen-food') {
           return p.categoryId === 'cat-3' && (nameLower.includes('frozen') || nameLower.includes('nugget') || nameLower.includes('পরাটা') || nameLower.includes('পরোটা') || nameLower.includes('frozen'));
         }
         if (selectedCategory === 'sports-fitness') {
-          return p.categoryId === 'cat-10' && (nameLower.includes('sport') || nameLower.includes('bat') || nameLower.includes('ball') || nameLower.includes('cricket') || nameLower.includes('jersey') || nameLower.includes('খেলাধূলা'));
+          return (p.categoryId === 'cat-10' || p.categoryId === 'sports-fitness') && (nameLower.includes('sport') || nameLower.includes('bat') || nameLower.includes('ball') || nameLower.includes('cricket') || nameLower.includes('jersey') || nameLower.includes('খেলাধূলা'));
         }
         if (selectedCategory === 'sarees-ethnic') {
           return p.categoryId === 'cat-2' && (nameLower.includes('saree') || nameLower.includes('panjabi') || nameLower.includes('kurta') || nameLower.includes('শাড়ি') || nameLower.includes('পাঞ্জাবি') || nameLower.includes('সালোয়ার'));
@@ -633,7 +670,10 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
           return p.categoryId === 'cat-4' && (nameLower.includes('plant') || nameLower.includes('seed') || nameLower.includes('soil') || nameLower.includes('টব') || nameLower.includes('বীজ') || nameLower.includes('গাছ'));
         }
         if (selectedCategory === 'automotive') {
-          return p.categoryId === 'cat-1' && (nameLower.includes('car') || nameLower.includes('bike') || nameLower.includes('charger') || nameLower.includes('holder') || nameLower.includes('গাড়ি'));
+          return (p.categoryId === 'cat-1' || p.categoryId === 'automotive') && (nameLower.includes('car') || nameLower.includes('bike') || nameLower.includes('charger') || nameLower.includes('holder') || nameLower.includes('গাড়ি'));
+        }
+        if (selectedCategory === 'watch-accessories') {
+          return nameLower.includes('watch') || nameLower.includes('smartwatch') || nameLower.includes('ঘড়ি') || nameLower.includes('sunglass') || nameLower.includes('চশমা');
         }
 
         return false;
@@ -939,6 +979,14 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
                 {(() => {
                   const categoriesList = [
                     { id: null, emoji: '🛍️', name: 'All', nameBn: 'সব পণ্য' },
+                    { id: 'combo-deals', emoji: '🎁', name: 'Combo', nameBn: 'কম্বো' },
+                    { id: 'fast-food', emoji: '🍔', name: 'Fast Food', nameBn: 'ফাস্টফুড' },
+                    { id: 'pizza-pasta', emoji: '🍕', name: 'Pizza', nameBn: 'পিজ্জা' },
+                    { id: 'cakes-pastry', emoji: '🎂', name: 'Cakes', nameBn: 'কেক' },
+                    { id: 'sweets-desserts', emoji: '🧁', name: 'Sweets', nameBn: 'মিষ্টি' },
+                    { id: 'restaurant-meals', emoji: '🍲', name: 'Biryani', nameBn: 'বিরিয়ানি' },
+                    { id: 'ice-cream', emoji: '🍦', name: 'Ice Cream', nameBn: 'আইসক্রিম' },
+                    { id: 'chocolates-candy', emoji: '🍫', name: 'Chocolates', nameBn: 'চকলেট' },
                     { id: 'dry-fruits-nuts', emoji: '🥜', name: 'Nuts', nameBn: 'বাদাম' },
                     { id: 'dry-fruits-dates', emoji: '🌴', name: 'Dates', nameBn: 'খেজুর' },
                     { id: 'grain-rice', emoji: '🌾', name: 'Rice', nameBn: 'চাল' },
@@ -946,30 +994,32 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ onOpenProduct, onBuy
                     { id: 'oil-ghee', emoji: '🧈', name: 'Oil & Ghee', nameBn: 'তেল ও ঘি' },
                     { id: 'dairy-milk', emoji: '🥛', name: 'Dairy & Milk', nameBn: 'দুধ ও দুগ্ধজাত' },
                     { id: 'tea-coffee', emoji: '☕', name: 'Tea & Coffee', nameBn: 'চা ও কফি' },
-                    { id: 'snacks-biscuits', emoji: '🍪', name: 'Snacks', nameBn: 'স্ন্যাক্স ও বিস্কুট' },
-                    { id: 'beverages', emoji: '🥤', name: 'Beverages', nameBn: 'পানীয় সামগ্রী' },
-                    { id: 'bakery', emoji: '🍞', name: 'Bakery', nameBn: 'বেকারি ও ব্রেড' },
-                    { id: 'frozen-food', emoji: '❄️', name: 'Frozen Food', nameBn: 'ফোজেন ফুড' },
+                    { id: 'snacks-biscuits', emoji: '🍪', name: 'Snacks', nameBn: 'স্ন্যাক্স' },
+                    { id: 'beverages', emoji: '🥤', name: 'Beverages', nameBn: 'পানীয়' },
+                    { id: 'bakery', emoji: '🍞', name: 'Bakery', nameBn: 'বেকারি' },
+                    { id: 'frozen-food', emoji: '❄️', name: 'Frozen Food', nameBn: 'ফ্রোজেন ফুড' },
                     { id: 'fresh-fruits', emoji: '🍎', name: 'Fruits', nameBn: 'ফলমূল' },
                     { id: 'fresh-vegetables', emoji: '🥦', name: 'Vegetables', nameBn: 'শাকসবজি' },
                     { id: 'meat-fish', emoji: '🥩', name: 'Meat & Fish', nameBn: 'মাছ ও মাংস' },
                     { id: 'eggs', emoji: '🥚', name: 'Eggs', nameBn: 'ডিম' },
                     { id: 'groceries-spices', emoji: '🌶️', name: 'Spices', nameBn: 'মসলাপাতি' },
-                    { id: 'cat-1', emoji: '🔌', name: 'Electronics', nameBn: 'ইলেকট্রনিক্স' },
+                    { id: 'cat-1', emoji: '📱', name: 'Electronics', nameBn: 'ইলেকট্রনিক্স' },
                     { id: 'cat-2', emoji: '👕', name: 'Clothing', nameBn: 'পোশাক' },
-                    { id: 'sarees-ethnic', emoji: '👘', name: 'Saree & Ethnic', nameBn: 'শাড়ি ও ঐতিহ্যবাহী' },
+                    { id: 'sarees-ethnic', emoji: '👘', name: 'Saree & Ethnic', nameBn: 'শাড়ি' },
                     { id: 'cat-7', emoji: '📦', name: 'Grocery Packs', nameBn: 'গ্রোসারি প্যাক' },
-                    { id: 'cat-8', emoji: '👟', name: 'Shoes', nameBn: 'জুতা স্যান্ডেল' },
+                    { id: 'cat-8', emoji: '👟', name: 'Shoes', nameBn: 'জুতা' },
+                    { id: 'watch-accessories', emoji: '⌚', name: 'Watches', nameBn: 'ঘড়ি' },
                     { id: 'cat-9', emoji: '💄', name: 'Cosmetics', nameBn: 'কসমেটিক্স' },
-                    { id: 'cat-10', emoji: '🧸', name: 'Toys', nameBn: 'খেলনা সামগ্রী' },
-                    { id: 'sports-fitness', emoji: '⚽', name: 'Sports', nameBn: 'খেলাধুলা সামগ্রী' },
+                    { id: 'baby-food', emoji: '🍼', name: 'Baby Care', nameBn: 'শিশু যত্ন' },
+                    { id: 'cat-10', emoji: '🧸', name: 'Toys', nameBn: 'খেলনা' },
+                    { id: 'sports-fitness', emoji: '⚽', name: 'Sports', nameBn: 'খেলাধুলা' },
                     { id: 'cat-11', emoji: '💊', name: 'Medicine', nameBn: 'ওষুধ' },
-                    { id: 'cat-12', emoji: '📚', name: 'Books', nameBn: 'বই স্টেশনারি' },
+                    { id: 'cat-12', emoji: '📚', name: 'Books', nameBn: 'বই' },
                     { id: 'home-cleaning', emoji: '🧼', name: 'Cleaning', nameBn: 'ক্লিনিং' },
                     { id: 'pickles-sauces', emoji: '🏺', name: 'Pickles', nameBn: 'আচার ও সস' },
-                    { id: 'home-kitchen', emoji: '🍳', name: 'Kitchen', nameBn: 'রান্নাঘর সামগ্রী' },
-                    { id: 'gardening', emoji: '🌱', name: 'Gardening', nameBn: 'বাগান সামগ্রী' },
-                    { id: 'automotive', emoji: '🚗', name: 'Automotive', nameBn: 'গাড়ির এক্সেসরিজ' },
+                    { id: 'home-kitchen', emoji: '🍳', name: 'Kitchen', nameBn: 'রান্নাঘর' },
+                    { id: 'gardening', emoji: '🌱', name: 'Gardening', nameBn: 'বাগান' },
+                    { id: 'automotive', emoji: '🚗', name: 'Automotive', nameBn: 'গাড়ি' },
                     { id: 'pet-care', emoji: '🐶', name: 'Pet Care', nameBn: 'পোষা প্রাণী' }
                   ];
 

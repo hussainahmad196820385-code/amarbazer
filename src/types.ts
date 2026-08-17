@@ -225,7 +225,8 @@ export interface CourierInfo {
 
 export interface Order {
   id: string;
-  orderNumber: string; // e.g. BD-2026-9812
+  orderNumber: string; // e.g. ORD-58392 or 58392
+  order5DigitId?: string; // 5-digit auto-generated order ID e.g. 58392
   userId: string;
   customerName: string;
   customerPhone: string;
@@ -250,6 +251,8 @@ export interface Order {
   paymentStatus: 'unpaid' | 'paid' | 'refunded';
   transactionId?: string;
   status: OrderStatus;
+  orderStatus?: string;
+  trackingStatus?: string;
   courier?: CourierInfo;
   createdAt: string;
   updatedAt: string;
@@ -262,24 +265,32 @@ export interface SellerStore {
   storeNameBn?: string;
   storeAddress?: string;
   storeCategory?: string;
+  ownerName?: string;
+  email?: string;
+  phone?: string;
   logoUrl: string;
   bannerUrl: string;
   tradeLicenseNumber: string;
   bkashNumber: string;
   bankAccountDetails?: string;
   isApproved: boolean;
+  isVerified?: boolean;
+  isFeatured?: boolean;
+  status?: string;
   totalSales: number;
   balance: number;
   rating: number;
   joinDate: string;
+  createdAt?: string;
   subscriptionPlan?: 'none' | 'starter' | 'business' | 'enterprise';
+  subscriptionTier?: string;
   subscriptionStatus?: 'active' | 'expired' | 'suspended' | 'pending';
   subscriptionAmountPaid?: number;
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
   subscriptionPaymentMethod?: string;
   subscriptionTxnId?: string;
-  cloudSubscriptionPlan?: 'none' | 'gcs_subscription' | 'firebase_subscription';
+  cloudSubscriptionPlan?: 'none' | 'gcs_subscription' | 'firebase_subscription' | string;
   cloudSubscriptionStatus?: 'active' | 'expired' | 'none';
   cloudSubscriptionExpiryDate?: string;
   ownerFirstName?: string;
@@ -292,10 +303,12 @@ export interface SellerStore {
   shopPhoto?: string;
   facePhoto?: string;
   warnings?: { id: string; message: string; date: string }[];
-  storageType?: 'central' | 'google_cloud' | 'firebase';
+  storageType?: 'central' | 'google_cloud' | 'firebase' | 'supabase' | string;
   storageCredentials?: string; // stringified JSON
   staffMembers?: SellerStaffMember[];
+  staff?: SellerStaffMember[];
   permissions?: SellerPermissionConfig;
+  permissionsConfig?: Record<string, any>;
 }
 
 export interface WithdrawalRequest {

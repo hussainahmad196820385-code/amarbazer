@@ -560,45 +560,39 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
           </div>
         )}
 
-        {/* Role selector in login mode */}
-        {activeMode === 'login' && (
-          <div className="w-full mt-3 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800 grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedRole('customer')}
-              className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                selectedRole === 'customer'
-                  ? 'bg-red-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <UserIcon className="w-3.5 h-3.5" />
-              <span>{language === 'bn' ? 'কাস্টমার' : 'Customer'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedRole('seller')}
-              className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                selectedRole === 'seller'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              <span>{language === 'bn' ? 'সেলার' : 'Seller'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedRole('admin')}
-              className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                selectedRole === 'admin'
-                  ? 'bg-emerald-500 text-slate-950 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{language === 'bn' ? 'এডমিন' : 'Admin'}</span>
-            </button>
+        {/* Enrolled account indicator in login mode */}
+        {activeMode === 'login' && enrolledUser && (
+          <div className="w-full mt-3 bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-200">
+                {enrolledUser.userRole === 'admin' ? (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                ) : enrolledUser.userRole === 'seller' ? (
+                  <Store className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <UserIcon className="w-4 h-4 text-cyan-400" />
+                )}
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-white leading-tight">
+                  {enrolledUser.userName || 'Enrolled User'}
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center space-x-1">
+                  <span className="capitalize">{enrolledUser.userRole || 'customer'}</span>
+                  <span>•</span>
+                  <span>{enrolledUser.enrolledFinger === 'thumb_right' ? 'Right Thumb' : enrolledUser.enrolledFinger}</span>
+                </div>
+              </div>
+            </div>
+            <div className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              enrolledUser.userRole === 'admin' 
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                : enrolledUser.userRole === 'seller'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+            }`}>
+              {enrolledUser.userRole === 'admin' ? 'এডমিন' : enrolledUser.userRole === 'seller' ? 'সেলার' : 'কাস্টমার'}
+            </div>
           </div>
         )}
 

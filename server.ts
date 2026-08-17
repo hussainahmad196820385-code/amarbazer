@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { 
   INITIAL_CATEGORIES, 
   INITIAL_PRODUCTS, 
@@ -116,7 +117,7 @@ function loadDb() {
         const admin = db.users.find(u => u.id === 'usr-admin-1' || u.role === 'admin');
         if (admin) {
           if (!admin.username) admin.username = 'admin';
-          if (!admin.password) admin.password = 'admin123';
+          if (!admin.password || admin.password === 'admin123') admin.password = 'hussain3122';
         }
         const seller = db.users.find(u => u.id === 'usr-seller-1');
         if (seller) {
@@ -236,6 +237,151 @@ if (!db.products.some(p => p.isApproved === false)) {
   }
 }
 
+// Supabase Server Integration
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://duwcufotrnuxlefssbim.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1d2N1Zm90cm51eGxlZnNzYmltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4OTQyNjYsImV4cCI6MjEwMjQ3MDI2Nn0.7RPLrSb52OuqhKM0UNRfR1Smu5_kX6X-o7Z3JdeCSco';
+
+
+let supabaseServer: SupabaseClient | null = null;
+function getSupabaseServer(): SupabaseClient | null {
+  if (!supabaseServer && SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      supabaseServer = createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log('🚀 Connected to Supabase Database successfully on server.');
+    } catch (err) {
+      console.warn('⚠️ Supabase init notice on server:', err);
+    }
+  }
+  return supabaseServer;
+}
+
+// Background sync helpers
+async function syncProductToSupabase(p: Product) {
+  const sb = getSupabaseServer();
+  if (!sb) return;
+  try {
+    const payload = {
+      id: p.id,
+      title: p.title,
+      title_bn: p.titleBn || p.title,
+      slug: p.slug,
+      description: p.description,
+      description_bn: p.descriptionBn,
+      price: p.price,
+      discount_price: p.discountPrice || null,
+      category_id: p.categoryId,
+      category_name: p.categoryName,
+      sub_category: p.subCategory || null,
+      brand: p.brand,
+      seller_id: p.sellerId,
+      seller_name: p.sellerName,
+      stock: p.stock,
+      sku: p.sku,
+      images: p.images || [],
+      rating: p.rating,
+      review_count: p.reviewCount,
+      tags: p.tags || [],
+      is_featured: p.isFeatured,
+      is_flash_deal: p.isFlashDeal,
+      is_combo: p.isCombo,
+      combo_items: p.comboItems || [],
+      variants: p.variants || [],
+      variant_prices: p.variantPrices || {},
+      bulk_offers: p.bulkOffers || [],
+      warranty: p.warranty,
+      custom_specs: p.customSpecs || [],
+      is_approved: p.isApproved,
+      created_at: p.createdAt
+    };
+    const { error } = await sb.from('products').upsert([payload]);
+    if (error) console.warn('Supabase product sync warning:', error.message);
+  } catch (err) {
+    console.warn('Supabase product sync error:', err);
+  }
+}
+
+async function deleteProductFromSupabase(id: string) {
+  const sb = getSupabaseServer();
+  if (!sb) return;
+  try {
+    await sb.from('products').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase product delete error:', err);
+  }
+}
+
+async function syncSellerToSupabase(s: SellerStore) {
+  const sb = getSupabaseServer();
+  if (!sb) return;
+  try {
+    const payload = {
+      id: s.id,
+      seller_id: s.sellerId || s.id,
+      store_name: s.storeName,
+      store_name_bn: s.storeNameBn || s.storeName,
+      owner_name: s.ownerName || '',
+      email: s.email || '',
+      phone: s.phone || '',
+      logo_url: s.logoUrl || '',
+      banner_url: s.bannerUrl || '',
+      rating: s.rating,
+      total_sales: s.totalSales,
+      is_verified: s.isVerified,
+      is_featured: s.isFeatured,
+      status: s.status,
+      subscription_tier: s.subscriptionTier,
+      subscription_status: s.subscriptionStatus,
+      subscription_expiry_date: s.subscriptionExpiryDate,
+      cloud_subscription_plan: s.cloudSubscriptionPlan,
+      storage_type: s.storageType,
+      storage_credentials: s.storageCredentials,
+      trade_license_number: s.tradeLicenseNumber,
+      bkash_number: s.bkashNumber,
+      bank_account_details: s.bankAccountDetails,
+      staff: s.staff || [],
+      permissions_config: s.permissionsConfig || {},
+      created_at: s.createdAt
+    };
+    const { error } = await sb.from('sellers').upsert([payload]);
+    if (error) console.warn('Supabase seller sync warning:', error.message);
+  } catch (err) {
+    console.warn('Supabase seller sync error:', err);
+  }
+}
+
+async function syncOrderToSupabase(o: Order) {
+  const sb = getSupabaseServer();
+  if (!sb) return;
+  try {
+    const payload = {
+      id: o.id,
+      order_number: o.orderNumber,
+      order_5_digit_id: o.order5DigitId,
+      user_id: o.userId,
+      customer_name: o.customerName,
+      customer_phone: o.customerPhone,
+      items: o.items || [],
+      subtotal: o.subtotal,
+      discount_amount: o.discountAmount,
+      coupon_code: o.couponCode,
+      shipping_fee: o.shippingFee,
+      total_amount: o.totalAmount,
+      payment_method: o.paymentMethod,
+      payment_status: o.paymentStatus,
+      order_status: o.status || 'pending',
+      tracking_status: o.trackingStatus || 'Order Placed',
+      courier: o.courier || {},
+      shipping_address: o.shippingAddress || {},
+      transaction_id: o.transactionId,
+      created_at: o.createdAt
+    };
+    const { error } = await sb.from('orders').upsert([payload]);
+    if (error) console.warn('Supabase order sync warning:', error.message);
+  } catch (err) {
+    console.warn('Supabase order sync error:', err);
+  }
+}
+
 // Lazy setup for Gemini API
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
@@ -351,6 +497,77 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  // Supabase Database Connection Diagnostics
+  app.get('/api/supabase/status', async (req, res) => {
+    const sb = getSupabaseServer();
+    const isConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
+    if (!sb || !isConfigured) {
+      return res.json({
+        connected: false,
+        configured: isConfigured,
+        message: 'Supabase credentials not configured in environment variables.'
+      });
+    }
+
+    try {
+      const { data, error } = await sb.from('products').select('id').limit(1);
+      if (error) {
+        return res.json({
+          connected: false,
+          configured: true,
+          error: error.message,
+          message: 'Supabase table query failed. Please ensure tables are created with supabase_schema.sql'
+        });
+      }
+      return res.json({
+        connected: true,
+        configured: true,
+        message: 'Supabase connected and tables verified!'
+      });
+    } catch (err: any) {
+      return res.json({
+        connected: false,
+        configured: true,
+        error: err.message || String(err)
+      });
+    }
+  });
+
+  // Bulk Push Local DB to Supabase
+  app.post('/api/supabase/sync', async (req, res) => {
+    const sb = getSupabaseServer();
+    if (!sb) {
+      return res.status(400).json({ success: false, message: 'Supabase not configured.' });
+    }
+
+    try {
+      let prodCount = 0;
+      let sellerCount = 0;
+      let orderCount = 0;
+
+      for (const p of db.products) {
+        await syncProductToSupabase(p);
+        prodCount++;
+      }
+      for (const s of db.sellers) {
+        await syncSellerToSupabase(s);
+        sellerCount++;
+      }
+      for (const o of db.orders) {
+        await syncOrderToSupabase(o);
+        orderCount++;
+      }
+
+      res.json({
+        success: true,
+        message: `Synced ${prodCount} products, ${sellerCount} sellers, and ${orderCount} orders to Supabase database!`,
+        synced: { products: prodCount, sellers: sellerCount, orders: orderCount }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Sync failed' });
+    }
+  });
+
   // Resolve Google Maps URL to friendly address
   app.post('/api/resolve-map-link', async (req, res) => {
     const { url } = req.body;
@@ -405,15 +622,15 @@ async function startServer() {
 
       // Support default aliases if not matched yet
       if (!user) {
-        if (cleanUsername === 'admin' || cleanUsername === 'admin123' || cleanUsername === 'এডমিন') {
+        if (cleanUsername === 'admin' || cleanUsername === 'এডমিন') {
           user = db.users.find(u => u.id === 'usr-admin-1' || u.role === 'admin');
-        } else if (cleanUsername === 'seller' || cleanUsername === 'seller123' || cleanUsername === 'সেলার') {
+        } else if (cleanUsername === 'seller' || cleanUsername === 'সেলার') {
           user = db.users.find(u => u.id === 'usr-seller-1' || (u.role === 'seller' && !u.isStaff));
-        } else if (cleanUsername === 'customer' || cleanUsername === 'customer123' || cleanUsername === 'কাস্টমার') {
+        } else if (cleanUsername === 'customer' || cleanUsername === 'কাস্টমার') {
           user = db.users.find(u => u.id === 'usr-demo-cust' || u.role === 'customer');
-        } else if (cleanUsername === 'systemadmin' || cleanUsername === 'systemadmin123') {
+        } else if (cleanUsername === 'systemadmin') {
           user = db.users.find(u => u.id === 'usr-sysadmin-1' || u.role === 'system_admin');
-        } else if (cleanUsername === 'manager' || cleanUsername === 'manager123') {
+        } else if (cleanUsername === 'manager') {
           user = db.users.find(u => u.id === 'usr-manager-1' || u.role === 'manager');
         }
       }
@@ -459,7 +676,7 @@ async function startServer() {
 
       // Check password dynamically against the user's saved password
       const expectedPassword = user.password || (
-        user.role === 'admin' ? 'admin123' :
+        user.role === 'admin' ? 'hussain3122' :
         user.role === 'seller' ? 'seller123' :
         user.role === 'system_admin' ? 'systemadmin123' :
         user.role === 'manager' ? 'manager123' : 'customer123'
@@ -539,7 +756,7 @@ async function startServer() {
 
     // Verify current password if provided
     const currentPass = user.password || (
-      user.role === 'admin' ? 'admin123' :
+      user.role === 'admin' ? 'hussain3122' :
       user.role === 'seller' ? 'seller123' :
       user.role === 'system_admin' ? 'systemadmin123' :
       user.role === 'manager' ? 'manager123' : 'customer123'
@@ -742,6 +959,7 @@ async function startServer() {
     };
     db.products.unshift(newProduct);
     saveDb();
+    syncProductToSupabase(newProduct);
     res.status(201).json(newProduct);
   });
 
@@ -750,12 +968,14 @@ async function startServer() {
     if (idx === -1) return res.status(404).json({ error: 'Product not found' });
     db.products[idx] = { ...db.products[idx], ...req.body };
     saveDb();
+    syncProductToSupabase(db.products[idx]);
     res.json(db.products[idx]);
   });
 
   app.delete('/api/products/:id', (req, res) => {
     db.products = db.products.filter(p => p.id !== req.params.id);
     saveDb();
+    deleteProductFromSupabase(req.params.id);
     res.json({ success: true });
   });
 
@@ -847,7 +1067,15 @@ async function startServer() {
   });
 
   app.get('/api/orders/:id', (req, res) => {
-    const ord = db.orders.find(o => o.id === req.params.id || o.orderNumber === req.params.id);
+    const rawId = req.params.id.trim().replace(/^#/, '');
+    const ord = db.orders.find(o => 
+      o.id === rawId || 
+      o.orderNumber === rawId || 
+      o.orderNumber === `ORD-${rawId}` || 
+      o.order5DigitId === rawId ||
+      o.id.includes(rawId) ||
+      o.orderNumber.includes(rawId)
+    );
     if (!ord) return res.status(404).json({ error: 'Order not found' });
     res.json(ord);
   });
@@ -858,7 +1086,9 @@ async function startServer() {
       items, subtotal, discountAmount, couponCode, shippingFee, totalAmount, paymentMethod 
     } = req.body;
 
-    const orderNum = `BD-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    // Generate strict 5-digit numeric Order ID (10000 to 99999)
+    const order5Digit = Math.floor(10000 + Math.random() * 90000).toString();
+    const orderNum = `ORD-${order5Digit}`;
     const isPaid = paymentMethod !== 'cod';
     const txId = isPaid ? `TRX${Math.floor(100000 + Math.random() * 900000)}${paymentMethod.toUpperCase()}` : undefined;
 
@@ -866,8 +1096,9 @@ async function startServer() {
     const chosenProvider = providers[Math.floor(Math.random() * providers.length)];
 
     const newOrder: Order = {
-      id: `ord-${Date.now()}`,
+      id: `ord-${order5Digit}`,
       orderNumber: orderNum,
+      order5DigitId: order5Digit,
       userId: userId || 'usr-demo-cust',
       customerName: customerName || 'Valued Customer',
       customerPhone: customerPhone || '01700000000',
@@ -913,6 +1144,7 @@ async function startServer() {
     });
 
     saveDb();
+    syncOrderToSupabase(newOrder);
     res.status(201).json(newOrder);
   });
 
@@ -932,6 +1164,7 @@ async function startServer() {
     }
 
     saveDb();
+    syncOrderToSupabase(order);
     res.json(order);
   });
 
@@ -965,6 +1198,70 @@ async function startServer() {
     res.json(db.sellers);
   });
 
+  app.get('/api/sellers/:id', (req, res) => {
+    const seller = db.sellers.find(s => s.id === req.params.id || s.sellerId === req.params.id);
+    if (!seller) return res.status(404).json({ error: 'Seller not found' });
+    res.json(seller);
+  });
+
+  app.post('/api/sellers', (req, res) => {
+    const existing = db.sellers.find(s => s.id === req.body.id || (req.body.sellerId && s.sellerId === req.body.sellerId));
+    if (existing) {
+      Object.assign(existing, req.body);
+      saveDb();
+      syncSellerToSupabase(existing);
+      return res.json(existing);
+    }
+
+    const sellerId = req.body.sellerId || req.body.id || `usr-sel-${Date.now()}`;
+    const storeId = req.body.id || `sel-${Date.now()}`;
+    const newSeller: SellerStore = {
+      id: storeId,
+      sellerId: sellerId,
+      storeName: req.body.storeName || 'New BD Store',
+      storeNameBn: req.body.storeNameBn || req.body.storeName,
+      ownerName: req.body.ownerName || '',
+      email: req.body.email || '',
+      phone: req.body.phone || '',
+      logoUrl: req.body.logoUrl || 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=200&q=80',
+      bannerUrl: req.body.bannerUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80',
+      rating: 5.0,
+      totalSales: 0,
+      balance: 0,
+      isApproved: true,
+      joinDate: new Date().toISOString().split('T')[0],
+      isVerified: true,
+      isFeatured: false,
+      status: req.body.status || 'approved',
+      subscriptionTier: req.body.subscriptionTier || 'pro',
+      subscriptionStatus: req.body.subscriptionStatus || 'active',
+      subscriptionExpiryDate: req.body.subscriptionExpiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      cloudSubscriptionPlan: req.body.cloudSubscriptionPlan || 'supabase_subscription',
+      storageType: req.body.storageType || 'supabase',
+      storageCredentials: req.body.storageCredentials || '',
+      tradeLicenseNumber: req.body.tradeLicenseNumber || '',
+      bkashNumber: req.body.bkashNumber || req.body.phone || '',
+      bankAccountDetails: req.body.bankAccountDetails || '',
+      staff: req.body.staff || [],
+      permissionsConfig: req.body.permissionsConfig || {
+        canManageOrders: true,
+        canManageProducts: true,
+        canManageCoupons: true,
+        canManageFlashSales: true,
+        canManageStaff: true,
+        canViewAnalytics: true,
+        canManageStorage: true,
+        canManageBioAuth: true
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    db.sellers.unshift(newSeller);
+    saveDb();
+    syncSellerToSupabase(newSeller);
+    res.status(201).json(newSeller);
+  });
+
   app.put('/api/sellers/:id', (req, res) => {
     const seller = db.sellers.find(s => s.id === req.params.id || s.sellerId === req.params.id);
     if (!seller) return res.status(404).json({ error: 'Seller not found' });
@@ -986,6 +1283,7 @@ async function startServer() {
     if (storageCredentials !== undefined) seller.storageCredentials = storageCredentials;
 
     saveDb();
+    syncSellerToSupabase(seller);
     res.json(seller);
   });
 
@@ -1002,7 +1300,20 @@ async function startServer() {
 
     try {
       const creds = JSON.parse(storageCredentials || '{}');
-      if (storageType === 'google_cloud') {
+      if (storageType === 'supabase') {
+        const url = creds.supabaseUrl || creds.url || SUPABASE_URL;
+        const key = creds.supabaseKey || creds.anonKey || creds.key || SUPABASE_KEY;
+        if (!url || !key) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Missing Supabase required credentials! (supabaseUrl, anonKey)' 
+          });
+        }
+        return res.json({ 
+          success: true, 
+          message: `Successfully connected to Supabase Database & Storage: "${url}" for vendor "${seller.storeName}"!` 
+        });
+      } else if (storageType === 'google_cloud') {
         if (!creds.project_id || !creds.client_email || !creds.private_key || !creds.bucket_name) {
           return res.status(400).json({ 
             success: false, 

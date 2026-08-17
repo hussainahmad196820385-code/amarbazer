@@ -3,7 +3,8 @@ import {
   ShieldCheck, Users, Store, Package, ShoppingBag, Tag, 
   DollarSign, Settings, FileText, CheckCircle2, XCircle, 
   Trash2, Plus, ArrowUpRight, Lock, Key, RefreshCw,
-  Eye, ChevronDown, ChevronUp, Cloud, Database, Wifi, AlertTriangle
+  Eye, ChevronDown, ChevronUp, Cloud, Database, Wifi, AlertTriangle,
+  Copy, Check, ExternalLink, Server, Layers
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
@@ -127,6 +128,173 @@ export const AdminDashboard: React.FC = () => {
   const [timerHours, setTimerHours] = useState(3);
   const [timerMinutes, setTimerMinutes] = useState(0);
   const [timerSeconds, setTimerSeconds] = useState(0);
+
+  // Supabase Live Status & Sync state
+  const [supabaseStatus, setSupabaseStatus] = useState<{ connected: boolean; configured: boolean; message: string; error?: string } | null>(null);
+  const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ success: boolean; text: string } | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  const checkSupabaseStatus = async () => {
+    setSupabaseLoading(true);
+    try {
+      const res = await api.getSupabaseStatus();
+      setSupabaseStatus(res);
+    } catch (err: any) {
+      setSupabaseStatus({
+        connected: false,
+        configured: true,
+        message: err.message || 'Failed to ping Supabase status'
+      });
+    } finally {
+      setSupabaseLoading(false);
+    }
+  };
+
+  const handleSyncToSupabase = async () => {
+    setSyncLoading(true);
+    setSyncMessage(null);
+    try {
+      const res = await api.syncToSupabase();
+      if (res.success) {
+        setSyncMessage({
+          success: true,
+          text: language === 'bn' 
+            ? `সুপাবেস ডাটাবেজে সফলভাবে ডাটা সিঙ্ক হয়েছে! (${res.synced?.products || 0}টি প্রোডাক্ট, ${res.synced?.sellers || 0}টি সেলার, ${res.synced?.orders || 0}টি অর্ডার)`
+            : `Successfully synced to Supabase! (${res.synced?.products || 0} products, ${res.synced?.sellers || 0} sellers, ${res.synced?.orders || 0} orders)`
+        });
+        checkSupabaseStatus();
+      } else {
+        setSyncMessage({
+          success: false,
+          text: res.message || 'Sync failed.'
+        });
+      }
+    } catch (err: any) {
+      setSyncMessage({
+        success: false,
+        text: err.message || 'Sync request failed.'
+      });
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const sqlSchemaSnippet = `-- Run this in Supabase SQL Editor
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  title_bn TEXT,
+  slug TEXT,
+  description TEXT,
+  description_bn TEXT,
+  price NUMERIC NOT NULL,
+  discount_price NUMERIC,
+  category_id TEXT,
+  category_name TEXT,
+  sub_category TEXT,
+  brand TEXT,
+  seller_id TEXT,
+  seller_name TEXT,
+  stock INTEGER DEFAULT 0,
+  sku TEXT,
+  images JSONB DEFAULT '[]'::jsonb,
+  rating NUMERIC DEFAULT 5.0,
+  review_count INTEGER DEFAULT 0,
+  tags JSONB DEFAULT '[]'::jsonb,
+  is_featured BOOLEAN DEFAULT false,
+  is_flash_deal BOOLEAN DEFAULT false,
+  is_combo BOOLEAN DEFAULT false,
+  combo_items JSONB DEFAULT '[]'::jsonb,
+  variants JSONB DEFAULT '[]'::jsonb,
+  variant_prices JSONB DEFAULT '{}'::jsonb,
+  bulk_offers JSONB DEFAULT '[]'::jsonb,
+  warranty TEXT,
+  custom_specs JSONB DEFAULT '[]'::jsonb,
+  is_approved BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sellers (
+  id TEXT PRIMARY KEY,
+  seller_id TEXT,
+  store_name TEXT NOT NULL,
+  store_name_bn TEXT,
+  owner_name TEXT,
+  email TEXT,
+  phone TEXT,
+  logo_url TEXT,
+  banner_url TEXT,
+  rating NUMERIC DEFAULT 5.0,
+  total_sales NUMERIC DEFAULT 0,
+  is_verified BOOLEAN DEFAULT true,
+  is_featured BOOLEAN DEFAULT false,
+  status TEXT DEFAULT 'approved',
+  subscription_tier TEXT DEFAULT 'pro',
+  subscription_status TEXT DEFAULT 'active',
+  subscription_expiry_date TEXT,
+  cloud_subscription_plan TEXT DEFAULT 'supabase_subscription',
+  storage_type TEXT DEFAULT 'supabase',
+  storage_credentials TEXT,
+  trade_license_number TEXT,
+  bkash_number TEXT,
+  bank_account_details TEXT,
+  staff JSONB DEFAULT '[]'::jsonb,
+  permissions_config JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id TEXT PRIMARY KEY,
+  order_number TEXT NOT NULL,
+  order_5_digit_id TEXT,
+  user_id TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  customer_email TEXT,
+  items JSONB DEFAULT '[]'::jsonb,
+  subtotal NUMERIC DEFAULT 0,
+  discount_amount NUMERIC DEFAULT 0,
+  coupon_code TEXT,
+  shipping_fee NUMERIC DEFAULT 0,
+  total_amount NUMERIC DEFAULT 0,
+  payment_method TEXT DEFAULT 'cod',
+  payment_status TEXT DEFAULT 'pending',
+  order_status TEXT DEFAULT 'confirmed',
+  tracking_status TEXT DEFAULT 'Order Placed',
+  courier JSONB DEFAULT '{}'::jsonb,
+  shipping_address JSONB DEFAULT '{}'::jsonb,
+  transaction_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE,
+  phone TEXT,
+  role TEXT DEFAULT 'customer',
+  avatar_url TEXT,
+  is_verified BOOLEAN DEFAULT true,
+  addresses JSONB DEFAULT '[]'::jsonb,
+  custom_permissions JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);`;
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(sqlSchemaSnippet);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
+
+  // Fetch Supabase status on mount or tab change
+  useEffect(() => {
+    if (activeTab === 'settings' || activeTab === 'overview') {
+      checkSupabaseStatus();
+    }
+  }, [activeTab]);
 
   // Admin Password Change state
   const [adminOldPassword, setAdminOldPassword] = useState('');
@@ -1075,8 +1243,109 @@ export const AdminDashboard: React.FC = () => {
       {activeTab === 'settings' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left panel: Global parameters & Live Timer */}
+          {/* Left panel: Global parameters, Supabase Cloud Database & Live Timer */}
           <div className="lg:col-span-1 space-y-6 text-xs">
+            {/* Supabase Cloud Database & Realtime Sync Card */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 p-6 space-y-4 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-emerald-500 text-white rounded-xl shadow-xs">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                      Supabase Cloud Database
+                    </h3>
+                    <span className="text-[10px] text-slate-400">PostgreSQL Cloud Storage</span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    supabaseStatus?.connected
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      : supabaseStatus?.configured
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                        : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-800'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${supabaseStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    <span>{supabaseStatus?.connected ? 'Connected' : 'Configured'}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Project Details */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-slate-200/60 dark:border-slate-700/60 space-y-2">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400 font-semibold">Project Endpoint:</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300 truncate max-w-[170px]" title="https://duwcufotrnuxlefssbim.supabase.co">
+                    duwcufotrnuxlefssbim
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400 font-semibold">Database Tables:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    products, sellers, orders, users
+                  </span>
+                </div>
+              </div>
+
+              {/* Ping Message Status */}
+              {supabaseStatus && (
+                <div className={`p-2.5 rounded-xl text-[10px] leading-relaxed border ${
+                  supabaseStatus.connected
+                    ? 'bg-emerald-50/70 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900'
+                    : 'bg-amber-50/70 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900'
+                }`}>
+                  {supabaseStatus.message}
+                </div>
+              )}
+
+              {/* Sync Alert Message */}
+              {syncMessage && (
+                <div className={`p-2.5 rounded-xl text-[10px] font-semibold border ${
+                  syncMessage.success
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                    : 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+                }`}>
+                  {syncMessage.text}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={checkSupabaseStatus}
+                    disabled={supabaseLoading}
+                    className="py-2 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${supabaseLoading ? 'animate-spin' : ''}`} />
+                    <span>{supabaseLoading ? 'Pinging...' : 'Test Status'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopySql}
+                    className="py-2 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSql ? 'Copied SQL!' : 'Copy SQL'}</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSyncToSupabase}
+                  disabled={syncLoading}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
+                  <span>{syncLoading ? 'Syncing Catalog & Orders...' : 'Sync All Data to Supabase (১-ক্লিকে সিঙ্ক)'}</span>
+                </button>
+              </div>
+            </div>
+
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 h-fit shadow-xs">
               <h3 className="font-bold text-sm border-b pb-2 flex items-center space-x-2 text-slate-900 dark:text-white">
                 <Settings className="w-4 h-4 text-emerald-600" />
