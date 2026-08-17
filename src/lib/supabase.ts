@@ -244,11 +244,14 @@ export const supabaseDb = {
     if (!sb) return () => {};
     try {
       const channel = sb
-        .channel('realtime-products')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        .channel('public:products:changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+          console.log('[Supabase Realtime] Product changed in public.products:', payload.eventType);
           onChange();
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Supabase Realtime] Product subscription status:', status);
+        });
 
       return () => {
         sb.removeChannel(channel);
