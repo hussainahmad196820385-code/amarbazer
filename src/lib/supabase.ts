@@ -280,6 +280,26 @@ export const supabaseDb = {
       console.warn('Realtime orders subscription failed:', err);
       return () => {};
     }
+  },
+
+  subscribeToSellers(onChange: () => void): () => void {
+    const sb = getSupabase();
+    if (!sb) return () => {};
+    try {
+      const channel = sb
+        .channel('realtime-sellers')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sellers' }, () => {
+          onChange();
+        })
+        .subscribe();
+
+      return () => {
+        sb.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('Realtime sellers subscription failed:', err);
+      return () => {};
+    }
   }
 };
 

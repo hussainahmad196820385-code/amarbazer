@@ -693,25 +693,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshCategories();
     refreshSystemSettings();
 
-    // 1. Supabase Realtime Subscription
+    // 1. Supabase Realtime Subscriptions for live multi-device syncing
     const unsubProducts = supabaseDb.subscribeToProducts(() => {
       refreshProducts();
     });
+    const unsubSellers = supabaseDb.subscribeToSellers(() => {
+      refreshCategories();
+    });
 
-    // 2. Periodic sync (every 8 seconds) so updates from any phone/device sync everywhere
+    // 2. Periodic sync (every 5 seconds) so updates from any phone/device sync everywhere
     const interval = setInterval(() => {
       refreshProducts();
-    }, 8000);
+      refreshCategories();
+    }, 5000);
 
-    // 3. Sync on tab focus or visibility change
+    // 3. Sync immediately on tab focus or visibility change
     const handleFocus = () => {
       refreshProducts();
+      refreshCategories();
+      refreshSystemSettings();
     };
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
     return () => {
       unsubProducts();
+      unsubSellers();
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
