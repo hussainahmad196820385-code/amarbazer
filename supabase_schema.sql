@@ -194,4 +194,17 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'withdrawals' AND policyname = 'Public withdrawals access') THEN
     CREATE POLICY "Public withdrawals access" ON public.withdrawals FOR ALL USING (true) WITH CHECK (true);
   END IF;
-END $$;
+END $;
+
+-- 8. ENABLE REALTIME REPLICATION FOR LIVE MULTI-DEVICE SYNC
+DO $
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.products, public.sellers, public.orders, public.categories, public.users;
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Publication might already contain some tables or require individual adds
+      NULL;
+  END;
+END $;
+

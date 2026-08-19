@@ -382,6 +382,94 @@ async function syncOrderToSupabase(o: Order) {
   }
 }
 
+async function loadFromSupabaseOnStartup() {
+  const sb = getSupabaseServer();
+  if (!sb) return;
+  try {
+    const { data: prods, error: prodErr } = await sb.from('products').select('*');
+    if (!prodErr && prods && prods.length > 0) {
+      const mappedProds: Product[] = prods.map(p => ({
+        id: p.id,
+        title: p.title,
+        titleBn: p.title_bn || p.title,
+        slug: p.slug || (p.title || 'prod').toLowerCase().replace(/\s+/g, '-'),
+        description: p.description || '',
+        descriptionBn: p.description_bn,
+        price: Number(p.price) || 0,
+        discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
+        categoryId: p.category_id || 'cat-1',
+        categoryName: p.category_name || 'General',
+        subCategory: p.sub_category,
+        brand: p.brand || 'Local BD',
+        sellerId: p.seller_id || 'sel-1',
+        sellerName: p.seller_name || 'Dhaka Tech Store',
+        stock: Number(p.stock) || 0,
+        sku: p.sku || '',
+        images: Array.isArray(p.images) && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80'],
+        rating: Number(p.rating) || 5.0,
+        reviewCount: Number(p.review_count) || 0,
+        tags: Array.isArray(p.tags) ? p.tags : [],
+        isFeatured: Boolean(p.is_featured),
+        isFlashDeal: Boolean(p.is_flash_deal),
+        isCombo: Boolean(p.is_combo),
+        comboItems: Array.isArray(p.combo_items) ? p.combo_items : [],
+        variants: Array.isArray(p.variants) ? p.variants : [],
+        variantPrices: p.variant_prices || {},
+        bulkOffers: Array.isArray(p.bulk_offers) ? p.bulk_offers : [],
+        warranty: p.warranty,
+        customSpecs: Array.isArray(p.custom_specs) ? p.custom_specs : [],
+        isApproved: p.is_approved !== false,
+        createdAt: p.created_at || new Date().toISOString()
+      }));
+
+      const sbMap = new Map(mappedProds.map(p => [p.id, p]));
+      db.products = [...mappedProds, ...db.products.filter(p => !sbMap.has(p.id))];
+      console.log(`[Supabase Startup Sync] Loaded ${mappedProds.length} live products from Supabase!`);
+    }
+
+    const { data: sellersData, error: sellerErr } = await sb.from('sellers').select('*');
+    if (!sellerErr && sellersData && sellersData.length > 0) {
+      const mappedSellers: SellerStore[] = sellersData.map(s => ({
+        id: s.id,
+        sellerId: s.seller_id || s.id,
+        storeName: s.store_name,
+        storeNameBn: s.store_name_bn || s.store_name,
+        ownerName: s.owner_name || '',
+        email: s.email || '',
+        phone: s.phone || '',
+        logoUrl: s.logo_url || '',
+        bannerUrl: s.banner_url || '',
+        rating: Number(s.rating) || 5.0,
+        totalSales: Number(s.total_sales) || 0,
+        balance: 0,
+        isApproved: true,
+        joinDate: new Date().toISOString().split('T')[0],
+        isVerified: Boolean(s.is_verified),
+        isFeatured: Boolean(s.is_featured),
+        status: s.status || 'approved',
+        subscriptionTier: s.subscription_tier || 'pro',
+        subscriptionStatus: s.subscription_status || 'active',
+        subscriptionExpiryDate: s.subscription_expiry_date || '',
+        cloudSubscriptionPlan: s.cloud_subscription_plan || 'supabase_subscription',
+        storageType: s.storage_type || 'supabase',
+        storageCredentials: s.storage_credentials || '',
+        tradeLicenseNumber: s.trade_license_number || '',
+        bkashNumber: s.bkash_number || '',
+        bankAccountDetails: s.bank_account_details || '',
+        staff: Array.isArray(s.staff) ? s.staff : [],
+        permissionsConfig: s.permissions_config || {},
+        createdAt: s.created_at || new Date().toISOString()
+      }));
+
+      const sellerMap = new Map(mappedSellers.map(s => [s.id, s]));
+      db.sellers = [...mappedSellers, ...db.sellers.filter(s => !sellerMap.has(s.id))];
+      console.log(`[Supabase Startup Sync] Loaded ${mappedSellers.length} live sellers from Supabase!`);
+    }
+  } catch (err) {
+    console.warn('[Supabase Startup Sync] Notice:', err);
+  }
+}
+
 // Lazy setup for Gemini API
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
@@ -978,7 +1066,7 @@ async function startServer() {
       bulkOffers: req.body.bulkOffers || [],
       warranty: req.body.warranty,
       customSpecs: req.body.customSpecs,
-      isApproved: req.body.isApproved !== undefined ? Boolean(req.body.isApproved) : (req.body.sellerId === 'sel-1' || req.body.sellerId === 'admin' ? true : false),
+      isApproved: req.body.isApproved !== undefined ? Boolean(req.body.isApproved) : true,
       createdAt: new Date().toISOString()
     };
     db.products.unshift(newProduct);
@@ -1990,6 +2078,9 @@ Do not wrap your response in markdown formatting or write "json" or backticks, j
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Load latest cloud data from Supabase if tables are available
+  await loadFromSupabaseOnStartup();
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`AmarBazar BD Express Server running on http://0.0.0.0:${PORT}`);

@@ -628,7 +628,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshProducts = async () => {
     try {
       const data = await api.getProducts();
-      if (data && data.length) setProducts(data);
+      if (data && Array.isArray(data)) {
+        setProducts(data);
+      }
     } catch (e) {
       console.log('Using local products fallback');
     }
@@ -663,7 +665,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshCategories = async () => {
     try {
       const data = await api.getCategories();
-      if (data && data.length) setCategories(data);
+      if (data && Array.isArray(data)) {
+        setCategories(data);
+      }
     } catch (e) {
       console.log('Using local categories fallback');
     }
@@ -693,28 +697,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshCategories();
     refreshSystemSettings();
 
-    // 1. Supabase Realtime Subscription
+    // 1. Supabase Realtime Subscriptions for live multi-device syncing
     const unsubProducts = supabaseDb.subscribeToProducts(() => {
       refreshProducts();
     });
+    const unsubSellers = supabaseDb.subscribeToSellers(() => {
+      refreshCategories();
+      refreshProducts();
+    });
 
-    // 2. Periodic sync (every 8 seconds) so updates from any phone/device sync everywhere
+    // 2. Periodic background sync (every 3 seconds) across all open phones and laptops
     const interval = setInterval(() => {
       refreshProducts();
-    }, 8000);
+      refreshCategories();
+    }, 3000);
 
-    // 3. Sync on tab focus or visibility change
-    const handleFocus = () => {
+    // 3. Sync immediately on tab focus, visibility change, storage change, pageshow or reconnection
+    const handleSync = () => {
       refreshProducts();
+      refreshCategories();
+      refreshSystemSettings();
     };
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('pageshow', handleSync);
+    window.addEventListener('online', handleSync);
+    document.addEventListener('visibilitychange', handleSync);
 
     return () => {
       unsubProducts();
+      unsubSellers();
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('pageshow', handleSync);
+      window.removeEventListener('online', handleSync);
+      document.removeEventListener('visibilitychange', handleSync);
     };
   }, []);
 

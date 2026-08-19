@@ -549,3 +549,17 @@ export function getProductVariantStock(product: Product, selectedVariants: Recor
   return product.stock;
 }
 
+export interface StorageFile {
+  id: string;
+  name: string;
+  url: string;
+  sizeBytes: number;
+  formattedSize: string;
+  category: 'image' | 'pdf' | 'audio' | 'document' | 'data';
+  mimeType: string;
+  uploadedAt: string;
+  associatedWith?: string; // e.g. "Product: Samsung TV", "Invoice #8392", "Chat with Karim"
+  sellerId?: string;
+}
+
+

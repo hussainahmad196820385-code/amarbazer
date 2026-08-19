@@ -14,6 +14,8 @@ import { getTranslation } from '../../translations';
 import { StoreDirectory } from '../dashboard/StoreDirectory';
 import { InventoryWorkspace } from '../dashboard/InventoryWorkspace';
 import { SellerRolesPermissions } from './SellerRolesPermissions';
+import { CloudFileManagerModal } from '../common/CloudFileManagerModal';
+import { storageManager } from '../../lib/storageManager';
 
 export const SellerDashboard: React.FC = () => {
   const { 
@@ -274,42 +276,36 @@ export const SellerDashboard: React.FC = () => {
   const [dbSetupMode, setDbSetupMode] = useState<'auto' | 'custom'>('auto');
   const [connectingProgress, setConnectingProgress] = useState(0);
 
-  // 📦 Google Storage-like Progress Bar and Detailed Breakdown States
+  // 📦 Cloud Storage & Real File Manager States
   const [isStorageDetailOpen, setIsStorageDetailOpen] = useState(false);
   const [isStorageBillingOpen, setIsStorageBillingOpen] = useState(false);
+  const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const [isCleaningStorage, setIsCleaningStorage] = useState(false);
-  const [storageUsedBytes, setStorageUsedBytes] = useState(1.84); // Starts dynamic (e.g. 1.84 GB for 2 GB)
   const [storageCleaned, setStorageCleaned] = useState(false);
+  const [storageFiles, setStorageFiles] = useState(() => storageManager.getFiles(storeInfo?.id));
 
-  // Sync default starting storage dynamically based on cloud subscription plan to avoid >100% display
-  useEffect(() => {
-    const isUpgraded = storeInfo?.cloudSubscriptionPlan && storeInfo?.cloudSubscriptionPlan !== 'none' && storeInfo?.cloudSubscriptionStatus === 'active';
-    if (isUpgraded) {
-      setStorageUsedBytes(13.86); // 92.4% of 15 GB
-    } else {
-      setStorageUsedBytes(1.84); // 92% of 2 GB
-    }
-    setStorageCleaned(false);
-  }, [storeInfo?.cloudSubscriptionPlan, storeInfo?.cloudSubscriptionStatus]);
+  // Refresh storage files when store changes or when modal updates
+  const refreshStorageFiles = () => {
+    const updated = storageManager.getFiles(storeInfo?.id);
+    setStorageFiles(updated);
+  };
+
+  const isCloudActive = !!(storeInfo?.cloudSubscriptionPlan && storeInfo?.cloudSubscriptionPlan !== 'none' && storeInfo?.cloudSubscriptionStatus === 'active');
+  const displayStorageTotal = isCloudActive ? 15 : 2;
+  const storageStats = storageManager.calculateStats(storageFiles, displayStorageTotal);
+  
+  // Real percentage and readable format
+  const displayPercentage = storageStats.percentage;
+  const displayStorageUsed = storageStats.usedGb;
 
   const handleCleanUpStorageSpace = () => {
     setIsCleaningStorage(true);
     setTimeout(() => {
       setIsCleaningStorage(false);
-      const isUpgraded = storeInfo?.cloudSubscriptionPlan && storeInfo?.cloudSubscriptionPlan !== 'none' && storeInfo?.cloudSubscriptionStatus === 'active';
-      if (isUpgraded) {
-        setStorageUsedBytes(6.45); // Optimized to 6.45 GB (43% of 15 GB)
-      } else {
-        setStorageUsedBytes(0.86); // Optimized to 0.86 GB (43% of 2 GB)
-      }
       setStorageCleaned(true);
-    }, 2000);
+      refreshStorageFiles();
+    }, 1500);
   };
-
-  const isCloudActive = !!(storeInfo?.cloudSubscriptionPlan && storeInfo?.cloudSubscriptionPlan !== 'none' && storeInfo?.cloudSubscriptionStatus === 'active');
-  const displayStorageUsed = isCloudActive ? storageUsedBytes : 0;
-  const displayStorageTotal = isCloudActive ? 15 : 2;
-  const displayPercentage = Math.round((displayStorageUsed / displayStorageTotal) * 100);
 
   const getStorageLogo = (plan: string | undefined) => {
     const sizeClasses = "w-3.5 h-3.5 shrink-0";
@@ -2755,38 +2751,45 @@ export const SellerDashboard: React.FC = () => {
 
               {/* Middle: Dynamically stretching Progress Bar & brand logo */}
               <div 
-                onClick={() => setIsStorageBillingOpen(!isStorageBillingOpen)}
-                className="flex-1 flex items-center space-x-2.5 cursor-pointer bg-slate-100/40 dark:bg-slate-900/10 hover:bg-slate-100/80 dark:hover:bg-slate-900/30 px-2.5 py-1.5 rounded-xl transition duration-200"
+                onClick={() => setIsFileManagerOpen(true)}
+                title={language === 'bn' ? 'স্টোরেজ ও ফাইল ম্যানেজার খুলুন' : 'Open Storage & File Manager'}
+                className="flex-1 flex items-center space-x-2.5 cursor-pointer bg-slate-100/60 dark:bg-slate-900/30 hover:bg-slate-200/60 dark:hover:bg-slate-850 px-2.5 py-1.5 rounded-xl transition duration-200 group"
               >
                 {getStorageLogo(storeInfo?.cloudSubscriptionPlan)}
                 
-                <span className="text-[10px] font-extrabold text-slate-700 dark:text-slate-300 shrink-0">
+                <span className="text-[10px] font-extrabold text-slate-700 dark:text-slate-200 shrink-0">
                   {displayPercentage}%
                 </span>
 
                 {/* Stretching Progress Bar Track */}
-                <div className="flex-1 bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div className="flex-1 bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 border border-slate-300/40 dark:border-slate-700/40">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${
-                      displayPercentage >= 80 ? 'bg-rose-500' : 'bg-indigo-500'
+                      displayPercentage >= 85 
+                        ? 'bg-gradient-to-r from-amber-500 to-rose-500' 
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-400'
                     }`}
-                    style={{ width: `${displayPercentage}%` }}
+                    style={{ width: `${Math.min(100, Math.max(3, displayPercentage))}%` }}
                   />
                 </div>
 
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
-                  {displayStorageUsed === 0 ? "0" : displayStorageUsed.toFixed(2)} / {displayStorageTotal} GB
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 shrink-0 font-mono">
+                  {storageStats.formattedUsed} / {storageStats.formattedTotal}
                 </span>
               </div>
 
-              {/* Right Side: See contents action */}
-              <div 
-                onClick={() => setIsStorageDetailOpen(!isStorageDetailOpen)}
-                className="text-[10px] text-slate-400 dark:text-slate-500 font-bold flex items-center space-x-1 hover:text-emerald-500 transition-colors cursor-pointer shrink-0"
+              {/* Right Side: See contents / File Manager action */}
+              <button 
+                type="button"
+                onClick={() => setIsFileManagerOpen(true)}
+                className="text-[10.5px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-xl font-black flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 shadow-xs hover:scale-102"
               >
-                <span className="hidden sm:inline">{language === 'bn' ? 'ফাইলসমূহ দেখুন' : 'See contents'}</span>
                 <FolderOpen className="w-3.5 h-3.5 text-emerald-500" />
-              </div>
+                <span>{language === 'bn' ? 'ফাইল দেখুন' : 'View Files'}</span>
+                <span className="bg-emerald-500 text-slate-950 font-mono text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                  {storageFiles.length}
+                </span>
+              </button>
             </div>
 
             {/* Storage Purchase Billing Information Card (Collapsible, triggered by clicking storage icon/bar) */}
@@ -5554,6 +5557,18 @@ export const SellerDashboard: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Cloud File & Media Manager Modal */}
+      <CloudFileManagerModal
+        isOpen={isFileManagerOpen}
+        onClose={() => setIsFileManagerOpen(false)}
+        language={language}
+        sellerId={storeInfo?.id}
+        storeName={storeInfo?.name || 'আমার বাজার শপ'}
+        planName={storeInfo?.cloudSubscriptionPlan === 'gcs_subscription' ? 'Google Cloud Storage Pro' : storeInfo?.cloudSubscriptionPlan === 'firebase_subscription' ? 'Firebase Enterprise' : 'Supabase Live Free Tier'}
+        totalCapacityGb={displayStorageTotal}
+        onStorageUpdated={refreshStorageFiles}
+      />
 
     </div>
   );

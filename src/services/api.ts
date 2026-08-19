@@ -200,15 +200,37 @@ export const api = {
   // Products
   getProducts: async (params?: Record<string, string>): Promise<Product[]> => {
     const q = params ? '?' + new URLSearchParams(params).toString() : '';
+
+    // 1. Prioritize Supabase live cloud database if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const sbProducts = await supabaseDb.getProducts();
+        if (sbProducts !== null && Array.isArray(sbProducts)) {
+          saveLocalProducts(sbProducts);
+          let filtered = sbProducts;
+          if (params?.sellerId) {
+            filtered = filtered.filter(p => p.sellerId === params.sellerId || (params.sellerId === 'sel-1' && p.sellerId === 'usr-seller-1') || (params.sellerId === 'usr-seller-1' && p.sellerId === 'sel-1'));
+          }
+          if (params?.category) {
+            filtered = filtered.filter(p => p.categoryId === params.category || p.categoryName?.toLowerCase() === params.category.toLowerCase());
+          }
+          if (params?.search) {
+            const s = params.search.toLowerCase();
+            filtered = filtered.filter(p => p.title.toLowerCase().includes(s) || (p.titleBn && p.titleBn.toLowerCase().includes(s)));
+          }
+          return filtered;
+        }
+      } catch (e) {
+        console.warn('Supabase getProducts notice, falling back to server API', e);
+      }
+    }
+
+    // 2. Fetch from backend API
     try {
       const serverProducts = await fetchJson<Product[]>(`/api/products${q}`);
       if (serverProducts && Array.isArray(serverProducts)) {
         if (!params || Object.keys(params).length === 0) {
-          const localList = getLocalProducts();
-          const customLocal = localList.filter(lp => !serverProducts.some(sp => sp.id === lp.id));
-          const merged = [...customLocal, ...serverProducts];
-          saveLocalProducts(merged);
-          return merged;
+          saveLocalProducts(serverProducts);
         }
         return serverProducts;
       }
@@ -216,20 +238,7 @@ export const api = {
       console.warn('Backend products fetch skipped/failed, using local fallback');
     }
 
-    if (isSupabaseConfigured()) {
-      try {
-        const sbProducts = await supabaseDb.getProducts();
-        if (sbProducts && sbProducts.length > 0) {
-          saveLocalProducts(sbProducts);
-          let filtered = sbProducts;
-          if (params?.sellerId) {
-            filtered = filtered.filter(p => p.sellerId === params.sellerId || (params.sellerId === 'sel-1' && p.sellerId === 'usr-seller-1') || (params.sellerId === 'usr-seller-1' && p.sellerId === 'sel-1'));
-          }
-          return filtered;
-        }
-      } catch (e) {}
-    }
-
+    // 3. Fallback to local cache
     let prods = getLocalProducts();
     if (params?.sellerId) {
       prods = prods.filter(p => p.sellerId === params.sellerId || (params.sellerId === 'sel-1' && p.sellerId === 'usr-seller-1') || (params.sellerId === 'usr-seller-1' && p.sellerId === 'sel-1'));
@@ -300,92 +309,97 @@ export const api = {
       deliveryChargeOutside: product.deliveryChargeOutside ?? 120,
       isCodAvailable: product.isCodAvailable ?? true,
       isExpressDelivery: Boolean(product.isExpressDelivery),
-      isApproved: product.isApproved ?? true,
       createdAt: new Date().toISOString(),
-      ...product
+      ...product,
+      isApproved: true
     };
 
-    // 1. Immediately persist to local cache
+    // 1. First push directly to Supabase Cloud
+    let finalProd = newProd;
+    if (isSupabaseConfigured()) {
+      try {
+        const sbSaved = await supabaseDb.insertProduct(newProd);
+        if (sbSaved) {
+          finalProd = sbSaved;
+        }
+      } catch (err) {
+        console.warn('Direct Supabase product insert notice:', err);
+      }
+    }
+
+    // 2. Persist to local cache
     const localList = getLocalProducts();
-    const existingIdx = localList.findIndex(p => p.id === newProd.id);
+    const existingIdx = localList.findIndex(p => p.id === finalProd.id);
     let updatedList: Product[];
     if (existingIdx >= 0) {
       updatedList = [...localList];
-      updatedList[existingIdx] = newProd;
+      updatedList[existingIdx] = finalProd;
     } else {
-      updatedList = [newProd, ...localList];
+      updatedList = [finalProd, ...localList];
     }
     saveLocalProducts(updatedList);
 
-    // 2. Sync with backend API
+    // 3. Sync with backend API
     try {
-      const created = await fetchJson<Product>('/api/products', { method: 'POST', body: JSON.stringify(newProd) });
-      if (isSupabaseConfigured()) {
-        supabaseDb.insertProduct(created).catch(() => {});
-      }
-      return created || newProd;
-    } catch (err) {
-      console.warn('Backend API unavailable, stored in local database:', err);
-      if (isSupabaseConfigured()) {
-        try {
-          const fallbackProd = await supabaseDb.insertProduct(newProd);
-          if (fallbackProd) return fallbackProd;
-        } catch (e) {}
-      }
-      return newProd;
-    }
+      fetchJson<Product>('/api/products', { method: 'POST', body: JSON.stringify(finalProd) }).catch(() => {});
+    } catch {}
+
+    return finalProd;
   },
 
   updateProduct: async (id: string, product: Partial<Product>): Promise<Product> => {
-    // 1. Local update
+    // 1. Direct Supabase update
+    let updatedProd: Product = { ...product, id } as Product;
+    if (isSupabaseConfigured()) {
+      try {
+        const sbUpdated = await supabaseDb.updateProduct(id, product);
+        if (sbUpdated) {
+          updatedProd = sbUpdated;
+        }
+      } catch (err) {
+        console.warn('Direct Supabase product update notice:', err);
+      }
+    }
+
+    // 2. Local update
     const localList = getLocalProducts();
     const idx = localList.findIndex(p => p.id === id);
-    let updatedProd: Product = { ...product, id } as Product;
     if (idx >= 0) {
-      updatedProd = { ...localList[idx], ...product };
+      updatedProd = { ...localList[idx], ...product, ...updatedProd };
       const updatedList = [...localList];
       updatedList[idx] = updatedProd;
       saveLocalProducts(updatedList);
     }
 
+    // 3. Backend API update
     try {
-      const serverUpdated = await fetchJson<Product>(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(product) });
-      if (isSupabaseConfigured()) {
-        supabaseDb.updateProduct(id, serverUpdated).catch(() => {});
-      }
-      return serverUpdated;
-    } catch (err) {
-      if (isSupabaseConfigured()) {
-        try {
-          const fallback = await supabaseDb.updateProduct(id, product);
-          if (fallback) return fallback;
-        } catch (e) {}
-      }
-      return updatedProd;
-    }
+      fetchJson<Product>(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(product) }).catch(() => {});
+    } catch {}
+
+    return updatedProd;
   },
 
   deleteProduct: async (id: string): Promise<{ success: boolean }> => {
-    // 1. Local delete
+    // 1. Immediately remove from local memory & storage
     const localList = getLocalProducts();
     const filtered = localList.filter(p => p.id !== id);
     saveLocalProducts(filtered);
 
-    try {
-      const res = await fetchJson<{ success: boolean }>(`/api/products/${id}`, { method: 'DELETE' });
-      if (isSupabaseConfigured()) {
-        supabaseDb.deleteProduct(id).catch(() => {});
+    // 2. Synchronously delete from Supabase Cloud
+    if (isSupabaseConfigured()) {
+      try {
+        await supabaseDb.deleteProduct(id);
+      } catch (err) {
+        console.warn('Supabase deleteProduct error:', err);
       }
-      return res;
-    } catch (err) {
-      if (isSupabaseConfigured()) {
-        try {
-          const ok = await supabaseDb.deleteProduct(id);
-          return { success: ok };
-        } catch (e) {}
-      }
-      return { success: true };
     }
+
+    // 3. Delete from backend API
+    try {
+      fetchJson<{ success: boolean }>(`/api/products/${id}`, { method: 'DELETE' }).catch(() => {});
+    } catch {}
+
+    return { success: true };
   },
 
   // Categories
@@ -463,16 +477,6 @@ export const api = {
 
   // Sellers
   getSellers: async (): Promise<SellerStore[]> => {
-    try {
-      const serverSellers = await fetchJson<SellerStore[]>('/api/sellers');
-      if (serverSellers && Array.isArray(serverSellers)) {
-        saveLocalSellers(serverSellers);
-        return serverSellers;
-      }
-    } catch (err) {
-      console.warn('Backend sellers fetch notice, using fallback');
-    }
-
     if (isSupabaseConfigured()) {
       try {
         const list = await supabaseDb.getSellers();
@@ -481,6 +485,16 @@ export const api = {
           return list;
         }
       } catch (e) {}
+    }
+
+    try {
+      const serverSellers = await fetchJson<SellerStore[]>('/api/sellers');
+      if (serverSellers && Array.isArray(serverSellers)) {
+        saveLocalSellers(serverSellers);
+        return serverSellers;
+      }
+    } catch (err) {
+      console.warn('Backend sellers fetch notice, using fallback');
     }
 
     return getLocalSellers();
