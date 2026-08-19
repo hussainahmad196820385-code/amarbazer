@@ -21,6 +21,7 @@ import { BiometricAuthModal } from '../auth/BiometricAuthModal';
 import { RolesPermissionsHub } from '../common/RolesPermissionsHub';
 import { LanguageSettingsTab } from './LanguageSettingsTab';
 import { CurrencySettingsTab } from './CurrencySettingsTab';
+import { OrderSlipsHub } from './OrderSlipsHub';
 import { getLanguageMeta, getTranslation } from '../../services/languageService';
 import { getCurrencyMeta } from '../../services/currencyService';
 
@@ -43,7 +44,8 @@ export const CustomerProfilePanel: React.FC = () => {
     products, wishlist, toggleWishlist, addToCart
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'addresses' | 'orders' | 'wishlist' | 'wallet' | 'coupons' | 'tickets' | 'language_settings' | 'currency_settings' | 'roles_permissions' | 'security'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'addresses' | 'orders' | 'wishlist' | 'wallet' | 'coupons' | 'slips' | 'tickets' | 'language_settings' | 'currency_settings' | 'roles_permissions' | 'security'>('dashboard');
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -630,6 +632,24 @@ export const CustomerProfilePanel: React.FC = () => {
           >
             <Tag className="w-4 h-4 shrink-0" />
             <span>{language === 'bn' ? 'কুপন ও ভাউচার' : 'Coupons & Vouchers'}</span>
+          </button>
+
+          {/* DEDICATED SLIPS, INVOICES & DIGITAL PRINTER VAULT */}
+          <button
+            onClick={() => { setActiveTab('slips'); setSelectedOrder(null); }}
+            className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-extrabold transition duration-150 relative ${
+              activeTab === 'slips' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black' : 'text-slate-700 dark:text-slate-300 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400'
+            }`}
+          >
+            <FileText className="w-4 h-4 shrink-0 text-amber-500" />
+            <div className="flex items-center justify-between w-full">
+              <span>{language === 'bn' ? 'অর্ডার স্লিপ ও চালান ভল্ট' : 'Order Slips & Invoices Hub'}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                activeTab === 'slips' ? 'bg-black text-amber-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+              }`}>
+                {language === 'bn' ? 'প্রিন্ট ও PDF' : 'Print/PDF'}
+              </span>
+            </div>
           </button>
 
           <button
@@ -1817,6 +1837,11 @@ export const CustomerProfilePanel: React.FC = () => {
               </div>
 
             </div>
+          )}
+
+          {/* DEDICATED SLIPS, INVOICES & DIGITAL PRINTER VAULT */}
+          {activeTab === 'slips' && (
+            <OrderSlipsHub />
           )}
 
           {/* 8. SUPPORT HELPDESK TICKETS & LIVE CHAT */}

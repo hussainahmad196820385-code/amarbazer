@@ -106,6 +106,18 @@ export const ADMIN_ROLE_PRESETS: Record<string, { title: string; titleBn: string
       'admin_system_settings'
     ]
   },
+  supervisor: {
+    title: 'Operations & Store Supervisor',
+    titleBn: 'অপারেশনস ও স্টোর সুপারভাইজার',
+    permissions: [
+      'admin_sellers_approve',
+      'admin_orders_manage',
+      'admin_categories_manage',
+      'admin_coupons_manage',
+      'admin_users_manage',
+      'admin_sellers_permissions'
+    ]
+  },
   finance_officer: {
     title: 'Finance & Payout Officer',
     titleBn: 'ফাইন্যান্স ও পে-আউট অফিসার',
@@ -219,6 +231,19 @@ export const AVAILABLE_STAFF_PERMISSIONS: StaffPermissionMeta[] = [
 ];
 
 export const ROLE_PRESETS: Record<string, { title: string; titleBn: string; permissions: SellerStaffPermission[] }> = {
+  supervisor: {
+    title: 'Store Operations Supervisor',
+    titleBn: 'স্টোর অপারেশনস সুপারভাইজার',
+    permissions: [
+      'orders_view', 
+      'orders_process', 
+      'messages_chat', 
+      'reviews_manage', 
+      'products_view', 
+      'products_manage', 
+      'inventory_manage'
+    ]
+  },
   support: {
     title: 'Customer Support Assistant',
     titleBn: 'কাস্টমার সাপোর্ট ও হেল্পডেস্ক',

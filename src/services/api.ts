@@ -1,7 +1,7 @@
 import { Product, Category, Coupon, Order, SellerStore, User, WithdrawalRequest, SystemSettings, SellerStaffMember, AdminStaffMember, SellerPermissionConfig } from '../types';
 import { nativeBridge } from './nativeBridge';
 import { supabaseDb, isSupabaseConfigured } from '../lib/supabase';
-import { INITIAL_USERS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../data/initialData';
+import { INITIAL_USERS, INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_SELLERS } from '../data/initialData';
 
 function normalizeInput(str?: string): string {
   if (!str) return '';
@@ -24,11 +24,22 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
       },
       ...options
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: `HTTP error ${res.status}` }));
-      throw new Error(err.message || `HTTP error ${res.status}`);
+
+    const text = await res.text();
+    let data: any = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Server returned non-JSON response (${res.status})`);
+      }
     }
-    return res.json();
+
+    if (!res.ok) {
+      const errMsg = (data && (data.message || data.error)) || `HTTP error ${res.status}`;
+      throw new Error(errMsg);
+    }
+    return data as T;
   } catch (error: any) {
     // Propagate for fallback handlers
     throw error;
@@ -38,6 +49,41 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 const STORAGE_KEY_PRODUCTS = 'amarbazar_products_store';
 const STORAGE_KEY_ORDERS = 'amarbazar_orders_store';
 const STORAGE_KEY_CATEGORIES = 'amarbazar_categories_store';
+const STORAGE_KEY_SELLERS = 'amarbazar_sellers_store';
+
+function getLocalSellers(): SellerStore[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_SELLERS);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return INITIAL_SELLERS;
+}
+
+function saveLocalSellers(sellers: SellerStore[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_SELLERS, JSON.stringify(sellers));
+  } catch (e) {}
+}
+
+function getLocalCategories(): Category[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_CATEGORIES);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return INITIAL_CATEGORIES;
+}
+
+function saveLocalCategories(cats: Category[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(cats));
+  } catch (e) {}
+}
 
 function getLocalProducts(): Product[] {
   try {
@@ -343,7 +389,18 @@ export const api = {
   },
 
   // Categories
-  getCategories: () => fetchJson<Category[]>('/api/categories'),
+  getCategories: async (): Promise<Category[]> => {
+    try {
+      const serverCats = await fetchJson<Category[]>('/api/categories');
+      if (serverCats && Array.isArray(serverCats)) {
+        saveLocalCategories(serverCats);
+        return serverCats;
+      }
+    } catch {
+      // Fallback to local storage
+    }
+    return getLocalCategories();
+  },
   createCategory: (cat: Partial<Category>) => fetchJson<Category>('/api/categories', { method: 'POST', body: JSON.stringify(cat) }),
   deleteCategory: (id: string) => fetchJson<{ success: boolean }>(`/api/categories/${id}`, { method: 'DELETE' }),
 
@@ -407,35 +464,103 @@ export const api = {
   // Sellers
   getSellers: async (): Promise<SellerStore[]> => {
     try {
-      return await fetchJson<SellerStore[]>('/api/sellers');
-    } catch (err) {
-      if (isSupabaseConfigured()) {
-        const list = await supabaseDb.getSellers();
-        if (list && list.length > 0) return list;
+      const serverSellers = await fetchJson<SellerStore[]>('/api/sellers');
+      if (serverSellers && Array.isArray(serverSellers)) {
+        saveLocalSellers(serverSellers);
+        return serverSellers;
       }
+    } catch (err) {
+      console.warn('Backend sellers fetch notice, using fallback');
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const list = await supabaseDb.getSellers();
+        if (list && list.length > 0) {
+          saveLocalSellers(list);
+          return list;
+        }
+      } catch (e) {}
+    }
+
+    return getLocalSellers();
+  },
+
+  getSellerById: async (id: string): Promise<SellerStore> => {
+    try {
+      return await fetchJson<SellerStore>(`/api/sellers/${id}`);
+    } catch (err) {
+      const local = getLocalSellers();
+      const found = local.find(s => s.id === id || s.sellerId === id);
+      if (found) return found;
       throw err;
     }
   },
 
-  getSellerById: (id: string) => fetchJson<SellerStore>(`/api/sellers/${id}`),
-
   createSeller: async (data: Partial<SellerStore>): Promise<SellerStore> => {
+    const local = getLocalSellers();
+    const newSeller: SellerStore = {
+      id: data.id || `sel-${Date.now()}`,
+      sellerId: data.sellerId || `usr-sel-${Date.now()}`,
+      storeName: data.storeName || 'Store',
+      storeNameBn: data.storeNameBn || data.storeName || 'দোকান',
+      ownerName: data.ownerName || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      logoUrl: data.logoUrl || 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=200&q=80',
+      bannerUrl: data.bannerUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80',
+      rating: 5.0,
+      totalSales: 0,
+      balance: 0,
+      isApproved: true,
+      joinDate: new Date().toISOString().split('T')[0],
+      isVerified: true,
+      isFeatured: false,
+      status: data.status || 'approved',
+      subscriptionTier: data.subscriptionTier || 'pro',
+      subscriptionStatus: data.subscriptionStatus || 'active',
+      subscriptionExpiryDate: data.subscriptionExpiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      cloudSubscriptionPlan: data.cloudSubscriptionPlan || 'supabase_subscription',
+      storageType: data.storageType || 'supabase',
+      storageCredentials: data.storageCredentials || '',
+      tradeLicenseNumber: data.tradeLicenseNumber || '',
+      bkashNumber: data.bkashNumber || data.phone || '',
+      bankAccountDetails: data.bankAccountDetails || '',
+      staff: [],
+      staffMembers: [],
+      createdAt: new Date().toISOString(),
+      ...data
+    } as SellerStore;
+
+    const updated = [newSeller, ...local.filter(s => s.id !== newSeller.id)];
+    saveLocalSellers(updated);
+
     try {
-      const created = await fetchJson<SellerStore>('/api/sellers', { method: 'POST', body: JSON.stringify(data) });
+      const created = await fetchJson<SellerStore>('/api/sellers', { method: 'POST', body: JSON.stringify(newSeller) });
       if (isSupabaseConfigured()) {
-        supabaseDb.insertSeller(created).catch(() => {});
+        supabaseDb.insertSeller(created || newSeller).catch(() => {});
       }
-      return created;
+      return created || newSeller;
     } catch (err) {
       if (isSupabaseConfigured()) {
-        const fallback = await supabaseDb.insertSeller(data);
+        const fallback = await supabaseDb.insertSeller(newSeller);
         if (fallback) return fallback;
       }
-      throw err;
+      return newSeller;
     }
   },
 
   updateSeller: async (id: string, data: Partial<SellerStore>): Promise<SellerStore> => {
+    const local = getLocalSellers();
+    const idx = local.findIndex(s => s.id === id || s.sellerId === id);
+    let updatedSeller = { ...data, id } as SellerStore;
+    if (idx >= 0) {
+      updatedSeller = { ...local[idx], ...data };
+      const updatedList = [...local];
+      updatedList[idx] = updatedSeller;
+      saveLocalSellers(updatedList);
+    }
+
     try {
       const updated = await fetchJson<SellerStore>(`/api/sellers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
       if (isSupabaseConfigured()) {
@@ -447,11 +572,27 @@ export const api = {
         const fallback = await supabaseDb.updateSeller(id, data);
         if (fallback) return fallback;
       }
-      throw err;
+      return updatedSeller;
     }
   },
 
-  approveSeller: (id: string) => fetchJson<SellerStore>(`/api/sellers/${id}/approve`, { method: 'PATCH' }),
+  approveSeller: async (id: string): Promise<SellerStore> => {
+    const local = getLocalSellers();
+    const idx = local.findIndex(s => s.id === id || s.sellerId === id);
+    if (idx >= 0) {
+      local[idx].isApproved = true;
+      local[idx].status = 'approved';
+      local[idx].subscriptionStatus = 'active';
+      saveLocalSellers([...local]);
+    }
+
+    try {
+      return await fetchJson<SellerStore>(`/api/sellers/${id}/approve`, { method: 'PATCH' });
+    } catch (err) {
+      if (idx >= 0) return local[idx];
+      throw err;
+    }
+  },
   purchaseSubscription: (id: string, data: { plan: string; amountPaid: number; paymentMethod: string; txnId?: string }) => 
     fetchJson<SellerStore>(`/api/sellers/${id}/subscription`, { method: 'POST', body: JSON.stringify(data) }),
   updateSubscription: (id: string, data: { plan?: string; status?: string; expiryDate?: string; amountPaid?: number }) => 

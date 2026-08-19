@@ -29,17 +29,23 @@ export const Sidebar: React.FC = () => {
 
   useEffect(() => {
     if (currentUser?.role === 'admin') {
+      let isMounted = true;
       const fetchCount = async () => {
         try {
           const list = await api.getSellers();
-          setPendingSellersCount(list.filter(s => !s.isApproved).length);
-        } catch (err) {
-          console.error('Error fetching unapproved sellers', err);
+          if (isMounted && Array.isArray(list)) {
+            setPendingSellersCount(list.filter(s => !s.isApproved).length);
+          }
+        } catch {
+          // Gracefully handled by local fallback in api.ts
         }
       };
       fetchCount();
-      const interval = setInterval(fetchCount, 8000);
-      return () => clearInterval(interval);
+      const interval = setInterval(fetchCount, 15000);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
     }
   }, [currentUser, activePanel]);
 

@@ -249,6 +249,11 @@ export interface Order {
     quantity: number;
     price: number;
     selectedVariants?: Record<string, string>;
+    qualityGrade?: string;
+    warranty?: string;
+    sku?: string;
+    category?: string;
+    unit?: string;
   }[];
   subtotal: number;
   discountAmount: number;
