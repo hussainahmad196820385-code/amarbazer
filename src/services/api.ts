@@ -204,7 +204,11 @@ export const api = {
       const serverProducts = await fetchJson<Product[]>(`/api/products${q}`);
       if (serverProducts && Array.isArray(serverProducts)) {
         if (!params || Object.keys(params).length === 0) {
-          saveLocalProducts(serverProducts);
+          const localList = getLocalProducts();
+          const customLocal = localList.filter(lp => !serverProducts.some(sp => sp.id === lp.id));
+          const merged = [...customLocal, ...serverProducts];
+          saveLocalProducts(merged);
+          return merged;
         }
         return serverProducts;
       }
