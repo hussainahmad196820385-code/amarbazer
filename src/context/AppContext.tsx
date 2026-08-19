@@ -628,7 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshProducts = async () => {
     try {
       const data = await api.getProducts();
-      if (data && Array.isArray(data)) {
+      if (data && Array.isArray(data) && data.length > 0) {
         setProducts(data);
       }
     } catch (e) {
@@ -642,7 +642,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Persist in api / local storage / backend
     try {
       await api.deleteProduct(id);
-      await refreshProducts();
       return true;
     } catch (err) {
       console.warn('Error deleting product:', err);
@@ -654,7 +653,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const created = await api.createProduct(productData);
       setProducts(prev => [created, ...prev.filter(p => p.id !== created.id)]);
-      await refreshProducts();
+      api.getProducts().then(fresh => {
+        if (fresh && fresh.length > 0) {
+          setProducts(prev => {
+            const hasCreated = fresh.some(p => p.id === created.id);
+            return hasCreated ? fresh : [created, ...fresh.filter(p => p.id !== created.id)];
+          });
+        }
+      }).catch(() => {});
       return created;
     } catch (err) {
       console.error('Error creating product:', err);

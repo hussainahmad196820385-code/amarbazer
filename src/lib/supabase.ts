@@ -75,14 +75,21 @@ export const supabaseDb = {
     if (!sb) return null;
     try {
       const payload = formatProductForSupabase(product);
-      const { data, error } = await sb.from('products').upsert([payload]).select().single();
+      const { data, error } = await sb.from('products').upsert([payload]).select();
       if (error) {
-        console.error('Supabase insertProduct error:', error);
-        return null;
+        console.warn('Supabase insertProduct upsert warning:', error.message);
+        const { data: insData, error: insErr } = await sb.from('products').insert([payload]).select();
+        if (!insErr && insData && insData.length > 0) {
+          return normalizeProductFromSupabase(insData[0]);
+        }
+        return normalizeProductFromSupabase(payload);
       }
-      return normalizeProductFromSupabase(data);
+      if (data && data.length > 0) {
+        return normalizeProductFromSupabase(data[0]);
+      }
+      return normalizeProductFromSupabase(payload);
     } catch (err) {
-      console.error('Supabase save product error:', err);
+      console.warn('Supabase save product error:', err);
       return null;
     }
   },
@@ -92,14 +99,17 @@ export const supabaseDb = {
     if (!sb) return null;
     try {
       const payload = formatProductForSupabase(product);
-      const { data, error } = await sb.from('products').update(payload).eq('id', id).select().single();
+      const { data, error } = await sb.from('products').update(payload).eq('id', id).select();
       if (error) {
-        console.error('Supabase updateProduct error:', error);
-        return null;
+        console.warn('Supabase updateProduct warning:', error.message);
+        return normalizeProductFromSupabase(payload);
       }
-      return normalizeProductFromSupabase(data);
+      if (data && data.length > 0) {
+        return normalizeProductFromSupabase(data[0]);
+      }
+      return normalizeProductFromSupabase(payload);
     } catch (err) {
-      console.error('Supabase update product error:', err);
+      console.warn('Supabase update product error:', err);
       return null;
     }
   },

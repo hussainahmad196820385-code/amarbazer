@@ -201,56 +201,65 @@ export const api = {
   getProducts: async (params?: Record<string, string>): Promise<Product[]> => {
     const q = params ? '?' + new URLSearchParams(params).toString() : '';
 
+    let prods: Product[] = [];
+
     // 1. Prioritize Supabase live cloud database if configured
     if (isSupabaseConfigured()) {
       try {
         const sbProducts = await supabaseDb.getProducts();
-        if (sbProducts !== null && Array.isArray(sbProducts)) {
-          saveLocalProducts(sbProducts);
-          let filtered = sbProducts;
-          if (params?.sellerId) {
-            filtered = filtered.filter(p => p.sellerId === params.sellerId || (params.sellerId === 'sel-1' && p.sellerId === 'usr-seller-1') || (params.sellerId === 'usr-seller-1' && p.sellerId === 'sel-1'));
+        if (sbProducts && Array.isArray(sbProducts) && sbProducts.length > 0) {
+          // Merge with any freshly created local products that might not have reached cloud yet
+          const localList = getLocalProducts();
+          const merged = [...sbProducts];
+          for (const lp of localList) {
+            if (!merged.some(p => p.id === lp.id)) {
+              merged.unshift(lp);
+            }
           }
-          if (params?.category) {
-            filtered = filtered.filter(p => p.categoryId === params.category || p.categoryName?.toLowerCase() === params.category.toLowerCase());
-          }
-          if (params?.search) {
-            const s = params.search.toLowerCase();
-            filtered = filtered.filter(p => p.title.toLowerCase().includes(s) || (p.titleBn && p.titleBn.toLowerCase().includes(s)));
-          }
-          return filtered;
+          saveLocalProducts(merged);
+          prods = merged;
         }
       } catch (e) {
         console.warn('Supabase getProducts notice, falling back to server API', e);
       }
     }
 
-    // 2. Fetch from backend API
-    try {
-      const serverProducts = await fetchJson<Product[]>(`/api/products${q}`);
-      if (serverProducts && Array.isArray(serverProducts)) {
-        if (!params || Object.keys(params).length === 0) {
-          saveLocalProducts(serverProducts);
+    // 2. Fetch from backend API if prods is still empty
+    if (prods.length === 0) {
+      try {
+        const serverProducts = await fetchJson<Product[]>(`/api/products${q}`);
+        if (serverProducts && Array.isArray(serverProducts) && serverProducts.length > 0) {
+          if (!params || Object.keys(params).length === 0) {
+            saveLocalProducts(serverProducts);
+          }
+          prods = serverProducts;
         }
-        return serverProducts;
+      } catch (err) {
+        console.warn('Backend products fetch skipped/failed, using local fallback');
       }
-    } catch (err) {
-      console.warn('Backend products fetch skipped/failed, using local fallback');
     }
 
-    // 3. Fallback to local cache
-    let prods = getLocalProducts();
+    // 3. Fallback to local cache + default catalog if still empty
+    if (prods.length === 0) {
+      prods = getLocalProducts();
+    }
+    if (prods.length === 0) {
+      prods = INITIAL_PRODUCTS;
+      saveLocalProducts(INITIAL_PRODUCTS);
+    }
+
+    let filtered = prods;
     if (params?.sellerId) {
-      prods = prods.filter(p => p.sellerId === params.sellerId || (params.sellerId === 'sel-1' && p.sellerId === 'usr-seller-1') || (params.sellerId === 'usr-seller-1' && p.sellerId === 'sel-1'));
+      filtered = filtered.filter(p => p.sellerId === params.sellerId || (params.sellerId === 'sel-1' && p.sellerId === 'usr-seller-1') || (params.sellerId === 'usr-seller-1' && p.sellerId === 'sel-1'));
     }
     if (params?.category) {
-      prods = prods.filter(p => p.categoryId === params.category || p.categoryName?.toLowerCase() === params.category.toLowerCase());
+      filtered = filtered.filter(p => p.categoryId === params.category || p.categoryName?.toLowerCase() === params.category.toLowerCase());
     }
     if (params?.search) {
       const s = params.search.toLowerCase();
-      prods = prods.filter(p => p.title.toLowerCase().includes(s) || (p.titleBn && p.titleBn.toLowerCase().includes(s)));
+      filtered = filtered.filter(p => p.title.toLowerCase().includes(s) || (p.titleBn && p.titleBn.toLowerCase().includes(s)));
     }
-    return prods;
+    return filtered;
   },
 
   getProductById: async (id: string): Promise<Product> => {
