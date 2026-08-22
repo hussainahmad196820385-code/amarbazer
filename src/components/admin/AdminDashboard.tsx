@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
+import { supabaseDb } from '../../lib/supabase';
 import { hasPermission } from '../../lib/permissions';
 import { User, SellerStore, Order, Coupon, Category, WithdrawalRequest, SystemSettings } from '../../types';
 import { AdminRolesPermissions } from './AdminRolesPermissions';
@@ -283,6 +284,43 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchAdminData();
+
+    // Realtime subscriptions for orders and sellers
+    let unsubscribeOrders: (() => void) | null = null;
+    let unsubscribeSellers: (() => void) | null = null;
+
+    try {
+      unsubscribeOrders = supabaseDb.subscribeToOrders((orders) => {
+        if (orders && Array.isArray(orders)) {
+          setOrdersList(orders);
+        }
+      });
+    } catch (e) {}
+
+    try {
+      unsubscribeSellers = supabaseDb.subscribeToSellers((sellers) => {
+        if (sellers && Array.isArray(sellers)) {
+          setSellersList(sellers);
+        }
+      });
+    } catch (e) {}
+
+    // Polling fallback to keep admin data fresh across all devices
+    const interval = setInterval(() => {
+      fetchAdminData();
+    }, 5000);
+
+    const handleFocus = () => {
+      fetchAdminData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (unsubscribeOrders) unsubscribeOrders();
+      if (unsubscribeSellers) unsubscribeSellers();
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   useEffect(() => {

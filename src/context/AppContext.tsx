@@ -743,8 +743,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Real-time Supabase products listener
     let unsubscribeProducts: (() => void) | null = null;
     try {
-      unsubscribeProducts = supabaseDb.subscribeToProducts((sbProds) => {
-        if (sbProds && Array.isArray(sbProds) && sbProds.length > 0) {
+      unsubscribeProducts = supabaseDb.subscribeToProducts((sbProds, payload) => {
+        if (payload?.eventType === 'DELETE' && payload.old?.id) {
+          const deletedId = payload.old.id;
+          const localSet = getDeletedProductIds();
+          localSet.add(deletedId);
+          safeStorage.setItem('amarbazar_deleted_product_ids', JSON.stringify(Array.from(localSet)));
+          setProducts(prev => prev.filter(p => p.id !== deletedId));
+          try {
+            const stored = safeStorage.getJSON<Product[]>('amarbazar_products_store', []);
+            if (Array.isArray(stored)) {
+              safeStorage.setItem('amarbazar_products_store', JSON.stringify(stored.filter(p => p.id !== deletedId)));
+            }
+          } catch (e) {}
+          return;
+        }
+
+        if (sbProds && Array.isArray(sbProds)) {
           const deletedSet = getDeletedProductIds();
           const liveList = sbProds.filter(p => !deletedSet.has(p.id));
           setProducts(liveList);

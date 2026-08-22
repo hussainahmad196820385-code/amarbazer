@@ -511,7 +511,7 @@ export const SellerDashboard: React.FC = () => {
 
   // Real-time synchronization for seller products when global products change across any device
   useEffect(() => {
-    if (storeInfo && products && products.length > 0) {
+    if (storeInfo && products) {
       const currentStoreId = storeInfo.id;
       const filtered = products.filter(p => 
         p.sellerId === currentStoreId || 

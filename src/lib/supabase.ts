@@ -129,20 +129,26 @@ export const supabaseDb = {
     }
   },
 
-  subscribeToProducts(callback: (products: Product[]) => void): () => void {
+  subscribeToProducts(callback: (products: Product[], event?: any) => void): () => void {
     const sb = getSupabase();
     if (!sb) return () => {};
     try {
       const channel = sb
-        .channel('public:products')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
-          const prods = await this.getProducts();
-          if (prods && prods.length > 0) callback(prods);
+        .channel('realtime:products')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async (payload) => {
+          try {
+            const prods = await this.getProducts();
+            callback(prods, payload);
+          } catch (e) {
+            console.warn('Realtime products fetch error:', e);
+          }
         })
         .subscribe();
 
       return () => {
-        sb.removeChannel(channel);
+        try {
+          sb.removeChannel(channel);
+        } catch (e) {}
       };
     } catch {
       return () => {};
@@ -185,6 +191,28 @@ export const supabaseDb = {
     } catch (err) {
       console.warn('Supabase updateSeller notice:', err);
       return { ...updates, id } as SellerStore;
+    }
+  },
+
+  subscribeToSellers(callback: (sellers: SellerStore[]) => void): () => void {
+    const sb = getSupabase();
+    if (!sb) return () => {};
+    try {
+      const channel = sb
+        .channel('realtime:sellers')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sellers' }, async () => {
+          const list = await this.getSellers();
+          if (list && list.length > 0) callback(list);
+        })
+        .subscribe();
+
+      return () => {
+        try {
+          sb.removeChannel(channel);
+        } catch (e) {}
+      };
+    } catch {
+      return () => {};
     }
   },
 
@@ -239,7 +267,7 @@ export const supabaseDb = {
     if (!sb) return () => {};
     try {
       const channel = sb
-        .channel('public:categories')
+        .channel('realtime:categories')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, async () => {
           const cats = await this.getCategories();
           if (cats && cats.length > 0) callback(cats);
@@ -247,7 +275,9 @@ export const supabaseDb = {
         .subscribe();
 
       return () => {
-        sb.removeChannel(channel);
+        try {
+          sb.removeChannel(channel);
+        } catch (e) {}
       };
     } catch {
       return () => {};
@@ -300,6 +330,28 @@ export const supabaseDb = {
     }
   },
 
+  subscribeToOrders(callback: (orders: Order[]) => void): () => void {
+    const sb = getSupabase();
+    if (!sb) return () => {};
+    try {
+      const channel = sb
+        .channel('realtime:orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+          const list = await this.getOrders();
+          if (list && list.length > 0) callback(list);
+        })
+        .subscribe();
+
+      return () => {
+        try {
+          sb.removeChannel(channel);
+        } catch (e) {}
+      };
+    } catch {
+      return () => {};
+    }
+  },
+
   // USERS
   async insertUser(user: User): Promise<User> {
     const sb = getSupabase();
@@ -342,7 +394,7 @@ export const supabaseDb = {
     if (!sb) return () => {};
     try {
       const channel = sb
-        .channel('public:settings')
+        .channel('realtime:settings')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async () => {
           const settings = await this.getSettings();
           if (settings) callback(settings);
@@ -350,7 +402,9 @@ export const supabaseDb = {
         .subscribe();
 
       return () => {
-        sb.removeChannel(channel);
+        try {
+          sb.removeChannel(channel);
+        } catch (e) {}
       };
     } catch {
       return () => {};

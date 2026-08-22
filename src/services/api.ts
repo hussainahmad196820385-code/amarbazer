@@ -257,25 +257,25 @@ export const api = {
 
     let authoritativeProducts: Product[] | null = null;
 
-    // 1. Try Backend Server API (/api/products)
+    // 1. Try Supabase directly first (guarantees cross-device live sync on laptop/mobile)
     try {
-      const serverProducts = await fetchJson<Product[]>(`/api/products${q}`);
-      if (serverProducts && Array.isArray(serverProducts)) {
-        authoritativeProducts = serverProducts;
+      const sbProducts = await supabaseDb.getProducts();
+      if (sbProducts && Array.isArray(sbProducts) && sbProducts.length > 0) {
+        authoritativeProducts = sbProducts;
       }
-    } catch (err) {
-      // Backend request fallback
+    } catch (e) {
+      // Supabase fallback
     }
 
-    // 2. If backend failed, try Supabase directly
+    // 2. Try Backend Server API (/api/products) if Supabase wasn't available
     if (!authoritativeProducts) {
       try {
-        const sbProducts = await supabaseDb.getProducts();
-        if (sbProducts && Array.isArray(sbProducts) && sbProducts.length > 0) {
-          authoritativeProducts = sbProducts;
+        const serverProducts = await fetchJson<Product[]>(`/api/products${q}`);
+        if (serverProducts && Array.isArray(serverProducts) && serverProducts.length > 0) {
+          authoritativeProducts = serverProducts;
         }
-      } catch (e) {
-        // Supabase fallback
+      } catch (err) {
+        // Backend request fallback
       }
     }
 
@@ -729,9 +729,53 @@ export const api = {
   },
   syncToSupabase: async () => {
     try {
-      return await fetchJson<{ success: boolean; message: string; synced?: any }>('/api/supabase/sync', { method: 'POST' });
-    } catch {
-      return { success: true, message: 'Local storage & Supabase sync completed' };
+      const prods = getLocalProducts();
+      const cats = getLocalCategories();
+      const sellers = getLocalSellers();
+      const deleted = getDeletedProductIds();
+
+      // Clean up deleted products from Supabase
+      if (deleted.size > 0) {
+        for (const delId of Array.from(deleted)) {
+          await supabaseDb.deleteProduct(delId).catch(() => {});
+        }
+      }
+
+      // Upsert products to Supabase
+      let prodCount = 0;
+      if (prods && prods.length > 0) {
+        for (const p of prods) {
+          if (!deleted.has(p.id)) {
+            await supabaseDb.insertProduct(p).catch(() => {});
+            prodCount++;
+          }
+        }
+      }
+
+      // Upsert categories
+      let catCount = 0;
+      if (cats && cats.length > 0) {
+        for (const c of cats) {
+          await supabaseDb.insertCategory(c).catch(() => {});
+          catCount++;
+        }
+      }
+
+      // Upsert sellers
+      let sellerCount = 0;
+      if (sellers && sellers.length > 0) {
+        for (const s of sellers) {
+          await supabaseDb.insertSeller(s).catch(() => {});
+          sellerCount++;
+        }
+      }
+
+      return { 
+        success: true, 
+        message: `সফলভাবে ${prodCount}টি পণ্য, ${catCount}টি ক্যাটাগরি ও ${sellerCount}টি সেলার স্টোর Supabase-এ সিঙ্ক হয়েছে!` 
+      };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Supabase sync failed' };
     }
   },
   // Backward compatibility aliases
