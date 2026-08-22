@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
-import { supabaseDb } from '../../lib/supabase';
+import { supabaseDb, getStoredSupabaseConfig, configureSupabaseClient, SUPABASE_SQL_SETUP_SCRIPT } from '../../lib/supabase';
 import { hasPermission } from '../../lib/permissions';
 import { User, SellerStore, Order, Coupon, Category, WithdrawalRequest, SystemSettings } from '../../types';
 import { AdminRolesPermissions } from './AdminRolesPermissions';
@@ -135,6 +135,32 @@ export const AdminDashboard: React.FC = () => {
   const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ success: boolean; text: string } | null>(null);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [customSupabaseUrl, setCustomSupabaseUrl] = useState(() => getStoredSupabaseConfig().url);
+  const [customSupabaseKey, setCustomSupabaseKey] = useState(() => getStoredSupabaseConfig().anonKey);
+  const [configSaveMsg, setConfigSaveMsg] = useState<string | null>(null);
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_SETUP_SCRIPT);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
+  };
+
+  const handleSaveCredentials = () => {
+    if (!customSupabaseUrl || !customSupabaseKey) {
+      setConfigSaveMsg('Please provide both Supabase URL and Anon Key');
+      return;
+    }
+    configureSupabaseClient(customSupabaseUrl.trim(), customSupabaseKey.trim());
+    setConfigSaveMsg('Supabase credentials saved successfully! Testing connection...');
+    setTimeout(() => {
+      checkSupabaseStatus();
+      setShowCredentialsModal(false);
+      setConfigSaveMsg(null);
+    }, 1200);
+  };
 
   const checkSupabaseStatus = async () => {
     setSupabaseLoading(true);
@@ -1244,15 +1270,23 @@ export const AdminDashboard: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="space-y-2 pt-1">
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={checkSupabaseStatus}
                     disabled={supabaseLoading}
-                    className="py-2 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    className="py-2 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50 text-xs"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${supabaseLoading ? 'animate-spin' : ''}`} />
-                    <span>{supabaseLoading ? 'Pinging Supabase...' : 'Test Connection Status'}</span>
+                    <span>{supabaseLoading ? 'Pinging...' : 'Test Status'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSqlModal(true)}
+                    className="py-2 px-3 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer text-xs border border-indigo-200 dark:border-indigo-800"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>SQL Code & Guide</span>
                   </button>
                 </div>
 
@@ -1264,6 +1298,14 @@ export const AdminDashboard: React.FC = () => {
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
                   <span>{syncLoading ? 'Syncing Catalog & Orders...' : 'Sync All Data to Supabase (১-ক্লিকে সিঙ্ক)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCredentialsModal(true)}
+                  className="w-full py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-center font-medium hover:underline cursor-pointer"
+                >
+                  Supabase URL & Key সেটিংস পরিবর্তন করুন
                 </button>
               </div>
             </div>
@@ -1743,6 +1785,152 @@ export const AdminDashboard: React.FC = () => {
               className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-slate-800" 
               referrerPolicy="no-referrer"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Supabase SQL Setup Code Modal */}
+      {showSqlModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900/60">
+              <div className="flex items-center space-x-2">
+                <Database className="w-5 h-5 text-emerald-500" />
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white">Supabase SQL Editor কোড ও সেটআপ গাইড</h3>
+                  <p className="text-xs text-slate-500">Cross-Device লাইভ সিনক্রোনাইজেশনের জন্য এই কোডটি Supabase SQL Editor-এ রান করুন</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-4 text-xs">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800/60 space-y-1.5 text-emerald-900 dark:text-emerald-200">
+                <div className="font-bold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>৪টি সহজ ধাপে ডাটাবেজ লাইভ করার নিয়ম:</span>
+                </div>
+                <ol className="list-decimal pl-5 space-y-1 text-slate-700 dark:text-slate-300">
+                  <li>নিচের <span className="font-bold text-emerald-600 dark:text-emerald-400">"Copy Complete SQL Script"</span> বাটনে ক্লিক করে পুরো SQL কোড কপি করুন।</li>
+                  <li>আপনার <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-bold text-emerald-600">Supabase Dashboard</a>-এ যান এবং বাম পাশের মেনু থেকে <strong>SQL Editor</strong>-এ ক্লিক করুন।</li>
+                  <li><strong>"New query"</strong> বাটনে ক্লিক করে কপি করা SQL কোডটি পেস্ট করুন।</li>
+                  <li>নিচে সবুজ রঙের <strong>"Run"</strong> বাটনে ক্লিক করুন। সাথে সাথে সব টেবিল তৈরি হবে এবং <strong>Realtime</strong> এনেবল হয়ে যাবে!</li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-slate-600 dark:text-slate-300">SQL Setup Script:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopySql}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold shadow-xs transition cursor-pointer"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSql ? 'কপি হয়েছে (Copied!)' : 'Copy Complete SQL Script'}</span>
+                  </button>
+                </div>
+                <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl overflow-x-auto font-mono text-[11px] max-h-72 select-all leading-relaxed">
+                  {SUPABASE_SQL_SETUP_SCRIPT}
+                </pre>
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={handleCopySql}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition cursor-pointer flex items-center space-x-1.5"
+              >
+                {copiedSql ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedSql ? 'কপি সম্পন্ন!' : 'SQL কোড কপি করুন'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold rounded-xl transition cursor-pointer"
+              >
+                Close (বন্ধ করুন)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supabase Credentials Settings Modal */}
+      {showCredentialsModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center space-x-2">
+                <Database className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-bold text-slate-900 dark:text-white">Supabase Credentials Settings</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCredentialsModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              আপনার Supabase প্রজেক্টের Settings &gt; API থেকে Project URL এবং Anon Public API Key এখানে বসিয়ে সেভ করুন।
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-300">Supabase Project URL:</label>
+                <input
+                  type="text"
+                  value={customSupabaseUrl}
+                  onChange={(e) => setCustomSupabaseUrl(e.target.value)}
+                  placeholder="https://your-project.supabase.co"
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-900 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-300">Supabase Anon Public API Key:</label>
+                <textarea
+                  rows={3}
+                  value={customSupabaseKey}
+                  onChange={(e) => setCustomSupabaseKey(e.target.value)}
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  className="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-900 font-mono text-[11px]"
+                />
+              </div>
+
+              {configSaveMsg && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
+                  {configSaveMsg}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={handleSaveCredentials}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition cursor-pointer"
+              >
+                Save & Connect (সংরক্ষণ করুন)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCredentialsModal(false)}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-white font-bold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
