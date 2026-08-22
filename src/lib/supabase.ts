@@ -3,21 +3,24 @@ import { Product, Category, Order, SellerStore, User, SystemSettings } from '../
 
 // Read configuration from environment variables or custom local storage override
 const envMeta = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
-const envUrl: string = envMeta.VITE_SUPABASE_URL || '';
+const envUrl: string = envMeta.VITE_SUPABASE_URL || 'https://kwcurbkgzzjdmjxgzwyc.supabase.co';
 const envKey: string = envMeta.VITE_SUPABASE_ANON_KEY || '';
+
+// Fallback project URL & key for seamless out-of-the-box syncing
+const DEFAULT_FALLBACK_URL = 'https://kwcurbkgzzjdmjxgzwyc.supabase.co';
 
 // Stored manual configuration if user sets it via UI
 export function getStoredSupabaseConfig(): { url: string; anonKey: string; isConfigured: boolean } {
   try {
     const savedUrl = typeof window !== 'undefined' ? localStorage.getItem('amarbazar_supabase_url') : null;
     const savedKey = typeof window !== 'undefined' ? localStorage.getItem('amarbazar_supabase_key') : null;
-    const url = (savedUrl || envUrl || '').trim();
+    const url = (savedUrl || envUrl || DEFAULT_FALLBACK_URL).trim();
     const anonKey = (savedKey || envKey || '').trim();
     const isConfigured = Boolean(url && anonKey && url.startsWith('http'));
     return { url, anonKey, isConfigured };
   } catch {
     const isConfigured = Boolean(envUrl && envKey && envUrl.startsWith('http'));
-    return { url: envUrl, anonKey: envKey, isConfigured };
+    return { url: envUrl || DEFAULT_FALLBACK_URL, anonKey: envKey, isConfigured };
   }
 }
 
