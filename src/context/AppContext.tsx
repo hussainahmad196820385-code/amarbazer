@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { User, Product, Category, CartItem, Order, Language, CurrencyCode, Role, SystemSettings, Notification, ColorPalette, getProductUnitPrice, getBulkDiscountedPrice } from '../types';
 import { INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SYSTEM_SETTINGS } from '../data/initialData';
 import { api, getDeletedProductIds } from '../services/api';
-import { firebaseDb } from '../lib/firebase';
+import { supabaseDb } from '../lib/supabase';
 import { safeStorage } from '../lib/safeStorage';
 import { applyLiveLanguage } from '../services/languageService';
 import { applyLiveCurrency, formatCurrencyAmount } from '../services/currencyService';
@@ -740,36 +740,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('SSE connection notice:', e);
     }
 
-    // 2. Real-time Firebase Firestore deleted products listener (Instant deletion across all devices)
-    let unsubscribeDeletedProducts: (() => void) | null = null;
-    try {
-      unsubscribeDeletedProducts = firebaseDb.subscribeToDeletedProducts((cloudDeletedIds) => {
-        if (cloudDeletedIds && Array.isArray(cloudDeletedIds) && cloudDeletedIds.length > 0) {
-          const localSet = getDeletedProductIds();
-          let hasNew = false;
-          cloudDeletedIds.forEach(id => {
-            if (!localSet.has(id)) {
-              localSet.add(id);
-              hasNew = true;
-            }
-          });
-          if (hasNew) {
-            safeStorage.setItem('amarbazar_deleted_product_ids', JSON.stringify(Array.from(localSet)));
-            setProducts(prev => prev.filter(p => !localSet.has(p.id)));
-          }
-        }
-      });
-    } catch (e) {
-      console.warn('Firebase deleted products listener notice:', e);
-    }
-
-    // 3. Real-time Firebase Firestore products listener
+    // 2. Real-time Supabase products listener
     let unsubscribeProducts: (() => void) | null = null;
     try {
-      unsubscribeProducts = firebaseDb.subscribeToProducts((fbProds) => {
-        if (fbProds && Array.isArray(fbProds) && fbProds.length > 0) {
+      unsubscribeProducts = supabaseDb.subscribeToProducts((sbProds) => {
+        if (sbProds && Array.isArray(sbProds) && sbProds.length > 0) {
           const deletedSet = getDeletedProductIds();
-          const liveList = fbProds.filter(p => !deletedSet.has(p.id));
+          const liveList = sbProds.filter(p => !deletedSet.has(p.id));
           setProducts(liveList);
           try {
             safeStorage.setItem('amarbazar_products_store', JSON.stringify(liveList));
@@ -777,39 +754,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
     } catch (e) {
-      console.warn('Firebase real-time subscription error:', e);
+      console.warn('Supabase real-time subscription notice:', e);
     }
 
-    // 4. Real-time Firebase Firestore categories listener
+    // 3. Real-time Supabase categories listener
     let unsubscribeCategories: (() => void) | null = null;
     try {
-      unsubscribeCategories = firebaseDb.subscribeToCategories((fbCats) => {
-        if (fbCats && Array.isArray(fbCats) && fbCats.length > 0) {
-          setCategories(fbCats);
+      unsubscribeCategories = supabaseDb.subscribeToCategories((sbCats) => {
+        if (sbCats && Array.isArray(sbCats) && sbCats.length > 0) {
+          setCategories(sbCats);
           try {
-            safeStorage.setItem('amarbazar_categories_store', JSON.stringify(fbCats));
+            safeStorage.setItem('amarbazar_categories_store', JSON.stringify(sbCats));
           } catch (e) {}
         }
       });
     } catch (e) {}
 
-    // 5. Real-time Firebase Firestore settings listener
+    // 4. Real-time Supabase settings listener
     let unsubscribeSettings: (() => void) | null = null;
     try {
-      unsubscribeSettings = firebaseDb.subscribeToSettings((fbSettings) => {
-        if (fbSettings) {
-          setSystemSettings(fbSettings);
+      unsubscribeSettings = supabaseDb.subscribeToSettings((sbSettings) => {
+        if (sbSettings) {
+          setSystemSettings(sbSettings);
         }
       });
     } catch (e) {}
 
-    // 6. Fast polling fallback (every 4 seconds) to guarantee instant multi-device reflection
+    // 5. Fast polling fallback (every 4 seconds) to guarantee instant multi-device reflection
     const interval = setInterval(() => {
       refreshProducts();
       refreshCategories();
     }, 4000);
 
-    // 7. Sync on tab focus, visibility change, online status with safety debounce
+    // 6. Sync on tab focus, visibility change, online status with safety debounce
     let lastSyncTime = 0;
     const handleSync = () => {
       const now = Date.now();
@@ -845,11 +822,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (eventSource) {
         try {
           eventSource.close();
-        } catch (e) {}
-      }
-      if (unsubscribeDeletedProducts) {
-        try {
-          unsubscribeDeletedProducts();
         } catch (e) {}
       }
       if (unsubscribeProducts) {

@@ -129,41 +129,41 @@ export const AdminDashboard: React.FC = () => {
   const [timerMinutes, setTimerMinutes] = useState(0);
   const [timerSeconds, setTimerSeconds] = useState(0);
 
-  // Firebase Live Status & Sync state
-  const [firebaseStatus, setFirebaseStatus] = useState<{ connected: boolean; configured: boolean; message: string; error?: string } | null>(null);
-  const [firebaseLoading, setFirebaseLoading] = useState(false);
+  // Supabase Live Status & Sync state
+  const [supabaseStatus, setSupabaseStatus] = useState<{ connected: boolean; configured: boolean; message: string; error?: string } | null>(null);
+  const [supabaseLoading, setSupabaseLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ success: boolean; text: string } | null>(null);
 
-  const checkFirebaseStatus = async () => {
-    setFirebaseLoading(true);
+  const checkSupabaseStatus = async () => {
+    setSupabaseLoading(true);
     try {
-      const res = await api.getFirebaseStatus();
-      setFirebaseStatus(res);
+      const res = await api.getSupabaseStatus();
+      setSupabaseStatus(res);
     } catch (err: any) {
-      setFirebaseStatus({
+      setSupabaseStatus({
         connected: false,
         configured: true,
-        message: err.message || 'Failed to ping Firebase Firestore status'
+        message: err.message || 'Failed to ping Supabase status'
       });
     } finally {
-      setFirebaseLoading(false);
+      setSupabaseLoading(false);
     }
   };
 
-  const handleSyncToFirebase = async () => {
+  const handleSyncToSupabase = async () => {
     setSyncLoading(true);
     setSyncMessage(null);
     try {
-      const res = await api.syncToFirebase();
+      const res = await api.syncToSupabase();
       if (res.success) {
         setSyncMessage({
           success: true,
           text: language === 'bn' 
-            ? `ফায়ারবেস ফায়ারস্টোরে সফলভাবে ডাটা সিঙ্ক হয়েছে! (${res.synced?.products || 0}টি প্রোডাক্ট, ${res.synced?.sellers || 0}টি সেলার, ${res.synced?.orders || 0}টি অর্ডার)`
-            : `Successfully synced to Firebase Firestore! (${res.synced?.products || 0} products, ${res.synced?.sellers || 0} sellers, ${res.synced?.orders || 0} orders)`
+            ? `সুপারবেসে (Supabase) সফলভাবে ডাটা সিঙ্ক হয়েছে!`
+            : `Successfully synced to Supabase database!`
         });
-        checkFirebaseStatus();
+        checkSupabaseStatus();
       } else {
         setSyncMessage({
           success: false,
@@ -180,10 +180,10 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Fetch Firebase Firestore status on mount or tab change
+  // Fetch Supabase status on mount or tab change
   useEffect(() => {
     if (activeTab === 'settings' || activeTab === 'overview') {
-      checkFirebaseStatus();
+      checkSupabaseStatus();
     }
   }, [activeTab]);
 
@@ -1138,7 +1138,7 @@ export const AdminDashboard: React.FC = () => {
           
           {/* Left panel: Global parameters, Supabase Cloud Database & Live Timer */}
           <div className="lg:col-span-1 space-y-6 text-xs">
-            {/* Firebase Firestore Cloud Database & Realtime Sync Card */}
+            {/* Supabase Cloud Database & Realtime Sync Card */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 p-6 space-y-4 shadow-xs relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
                 <div className="flex items-center space-x-2">
@@ -1147,21 +1147,21 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                      Firebase Firestore Database
+                      Supabase Cloud Database
                     </h3>
-                    <span className="text-[10px] text-slate-400">Google Cloud Firestore</span>
+                    <span className="text-[10px] text-slate-400">PostgreSQL & Realtime Sync</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    firebaseStatus?.connected
+                    supabaseStatus?.connected
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                      : firebaseStatus?.configured
+                      : supabaseStatus?.configured
                         ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                         : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-800'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${firebaseStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                    <span>{firebaseStatus?.connected ? 'Connected' : 'Configured'}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${supabaseStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    <span>{supabaseStatus?.connected ? 'Connected' : 'Configured'}</span>
                   </span>
                 </div>
               </div>
@@ -1169,13 +1169,13 @@ export const AdminDashboard: React.FC = () => {
               {/* Project Details */}
               <div className="p-3 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-slate-200/60 dark:border-slate-700/60 space-y-2">
                 <div className="flex justify-between items-center text-[10px]">
-                  <span className="text-slate-400 font-semibold">Project Database:</span>
+                  <span className="text-slate-400 font-semibold">Engine / Backend:</span>
                   <span className="font-mono font-bold text-slate-700 dark:text-slate-300 truncate max-w-[170px]">
-                    Firestore (Firebase)
+                    Supabase + Vercel
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-[10px]">
-                  <span className="text-slate-400 font-semibold">Collections:</span>
+                  <span className="text-slate-400 font-semibold">Tables / Schema:</span>
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">
                     products, sellers, orders, users, categories
                   </span>
@@ -1183,13 +1183,13 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Ping Message Status */}
-              {firebaseStatus && (
+              {supabaseStatus && (
                 <div className={`p-2.5 rounded-xl text-[10px] leading-relaxed border ${
-                  firebaseStatus.connected
+                  supabaseStatus.connected
                     ? 'bg-emerald-50/70 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900'
                     : 'bg-amber-50/70 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900'
                 }`}>
-                  {firebaseStatus.message}
+                  {supabaseStatus.message}
                 </div>
               )}
 
@@ -1209,23 +1209,23 @@ export const AdminDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"
-                    onClick={checkFirebaseStatus}
-                    disabled={firebaseLoading}
+                    onClick={checkSupabaseStatus}
+                    disabled={supabaseLoading}
                     className="py-2 px-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${firebaseLoading ? 'animate-spin' : ''}`} />
-                    <span>{firebaseLoading ? 'Pinging Firestore...' : 'Test Connection Status'}</span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${supabaseLoading ? 'animate-spin' : ''}`} />
+                    <span>{supabaseLoading ? 'Pinging Supabase...' : 'Test Connection Status'}</span>
                   </button>
                 </div>
 
                 <button
                   type="button"
-                  onClick={handleSyncToFirebase}
+                  onClick={handleSyncToSupabase}
                   disabled={syncLoading}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
-                  <span>{syncLoading ? 'Syncing Catalog & Orders...' : 'Sync All Data to Firebase (১-ক্লিকে সিঙ্ক)'}</span>
+                  <span>{syncLoading ? 'Syncing Catalog & Orders...' : 'Sync All Data to Supabase (১-ক্লিকে সিঙ্ক)'}</span>
                 </button>
               </div>
             </div>
