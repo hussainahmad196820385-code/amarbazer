@@ -429,6 +429,75 @@ async function startServer() {
     });
   });
 
+  // Shared Supabase Config for all connected devices
+  app.get('/api/config/supabase', (req, res) => {
+    const config = (db as any).supabaseConfig || {
+      url: process.env.VITE_SUPABASE_URL || 'https://kwcurbkgzzjdmjxgzwyc.supabase.co',
+      anonKey: process.env.VITE_SUPABASE_ANON_KEY || ''
+    };
+    res.json(config);
+  });
+
+  app.post('/api/config/supabase', (req, res) => {
+    const { url, anonKey } = req.body;
+    if (url && anonKey) {
+      (db as any).supabaseConfig = { url: url.trim(), anonKey: anonKey.trim() };
+      saveDb();
+      broadcastSse({ type: 'supabase_configured', url: url.trim() });
+    }
+    res.json({ success: true, config: (db as any).supabaseConfig });
+  });
+
+  // Cross-device Server Batch Synchronization
+  app.post('/api/sync/batch', (req, res) => {
+    const { products, categories, sellers, deletedProductIds } = req.body;
+    
+    if (Array.isArray(deletedProductIds)) {
+      if (!db.deletedProductIds) db.deletedProductIds = [];
+      const set = new Set([...db.deletedProductIds, ...deletedProductIds]);
+      db.deletedProductIds = Array.from(set);
+      db.products = db.products.filter(p => !set.has(p.id));
+    }
+
+    if (Array.isArray(products) && products.length > 0) {
+      const deletedSet = new Set(db.deletedProductIds || []);
+      const validProds = products.filter(p => !deletedSet.has(p.id));
+      const map = new Map<string, Product>();
+      db.products.forEach(p => map.set(p.id, p));
+      validProds.forEach(p => map.set(p.id, p));
+      db.products = Array.from(map.values());
+    }
+
+    if (Array.isArray(categories) && categories.length > 0) {
+      const map = new Map<string, Category>();
+      db.categories.forEach(c => map.set(c.id, c));
+      categories.forEach(c => map.set(c.id, c));
+      db.categories = Array.from(map.values());
+    }
+
+    if (Array.isArray(sellers) && sellers.length > 0) {
+      const map = new Map<string, SellerStore>();
+      db.sellers.forEach(s => map.set(s.id, s));
+      sellers.forEach(s => map.set(s.id, s));
+      db.sellers = Array.from(map.values());
+    }
+
+    saveDb();
+    broadcastSse({ 
+      type: 'batch_synced', 
+      productCount: db.products.length,
+      categoryCount: db.categories.length,
+      sellerCount: db.sellers.length
+    });
+
+    res.json({
+      success: true,
+      productCount: db.products.length,
+      categoryCount: db.categories.length,
+      sellerCount: db.sellers.length
+    });
+  });
+
   // Backward compatibility alias for diagnostics
   app.get('/api/supabase/status', async (req, res) => {
     res.json({

@@ -60,11 +60,35 @@ export function configureSupabaseClient(url: string, anonKey: string): boolean {
         auth: { persistSession: true, autoRefreshToken: true },
         realtime: { params: { eventsPerSecond: 10 } }
       });
+      // Share with server so all mobile devices & other browsers get it
+      try {
+        fetch('/api/config/supabase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: cleanUrl, anonKey: cleanKey })
+        }).catch(() => {});
+      } catch (e) {}
       return true;
     }
   } catch (err) {
     console.error('Error saving Supabase config:', err);
   }
+  return false;
+}
+
+export async function initSupabaseFromRemote(): Promise<boolean> {
+  const current = getStoredSupabaseConfig();
+  if (current.isConfigured) return true;
+
+  try {
+    const res = await fetch('/api/config/supabase');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.url && data.anonKey && data.url.startsWith('http')) {
+        return configureSupabaseClient(data.url, data.anonKey);
+      }
+    }
+  } catch (e) {}
   return false;
 }
 
@@ -682,6 +706,82 @@ export const supabaseDb = {
     }
   },
 
+  async syncAllData(options: {
+    products?: Product[];
+    categories?: Category[];
+    sellers?: SellerStore[];
+    deletedProductIds?: string[];
+  }): Promise<{ success: boolean; message: string; details?: any }> {
+    const sb = getSupabase();
+    if (!sb) {
+      return { success: false, message: 'Supabase ক্লায়েন্ট কানেক্ট করা যায়নি।' };
+    }
+
+    try {
+      let prodCount = 0;
+      let catCount = 0;
+      let sellerCount = 0;
+
+      // 1. Delete removed products
+      if (options.deletedProductIds && options.deletedProductIds.length > 0) {
+        await sb.from('products').delete().in('id', options.deletedProductIds);
+      }
+
+      // 2. Batch Upsert Categories
+      if (options.categories && options.categories.length > 0) {
+        const catPayloads = options.categories.map(toDbCategory);
+        const { error: catErr } = await sb.from('categories').upsert(catPayloads, { onConflict: 'id' });
+        if (catErr) {
+          console.warn('Batch category sync error:', catErr);
+          throw new Error(`Categories টেবিল সিঙ্ক ব্যর্থ: ${catErr.message}`);
+        }
+        catCount = catPayloads.length;
+      }
+
+      // 3. Batch Upsert Sellers
+      if (options.sellers && options.sellers.length > 0) {
+        const sellerPayloads = options.sellers.map(toDbSeller);
+        const { error: sellerErr } = await sb.from('sellers').upsert(sellerPayloads, { onConflict: 'id' });
+        if (sellerErr) {
+          console.warn('Batch seller sync error:', sellerErr);
+          throw new Error(`Sellers টেবিল সিঙ্ক ব্যর্থ: ${sellerErr.message}`);
+        }
+        sellerCount = sellerPayloads.length;
+      }
+
+      // 4. Batch Upsert Products
+      if (options.products && options.products.length > 0) {
+        const prodPayloads = options.products.map(toDbProduct);
+        const { error: prodErr } = await sb.from('products').upsert(prodPayloads, { onConflict: 'id' });
+        if (prodErr) {
+          console.warn('Batch product sync error:', prodErr);
+          throw new Error(`Products টেবিল সিঙ্ক ব্যর্থ: ${prodErr.message}`);
+        }
+        prodCount = prodPayloads.length;
+      }
+
+      // 5. Also Sync to Backend Server Node.js DB for zero-latency fallback
+      try {
+        await fetch('/api/sync/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(options)
+        });
+      } catch (e) {}
+
+      return {
+        success: true,
+        message: `সফলভাবে ${prodCount}টি প্রোডাক্ট, ${catCount}টি ক্যাটাগরি এবং ${sellerCount}টি সেলার স্টোর Supabase ও সেন্ট্রাল সার্ভারে সিঙ্ক হয়েছে!`
+      };
+    } catch (err: any) {
+      console.error('syncAllData error:', err);
+      return {
+        success: false,
+        message: err.message || 'Supabase সিঙ্ক ব্যর্থ হয়েছে'
+      };
+    }
+  },
+
   subscribeToCategories(callback: (categories: Category[]) => void): () => void {
     const sb = getSupabase();
     if (!sb) return () => {};
@@ -1034,10 +1134,38 @@ create policy "Public Access Users" on public.users for all using (true) with ch
 create policy "Public Access Settings" on public.settings for all using (true) with check (true);
 
 -- 8. REALTIME REPLICATION (CRITICAL FOR LIVE CROSS-DEVICE SYNC)
-alter publication supabase_realtime add table public.products;
-alter publication supabase_realtime add table public.categories;
-alter publication supabase_realtime add table public.sellers;
-alter publication supabase_realtime add table public.orders;
-alter publication supabase_realtime add table public.settings;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'products'
+  ) then
+    alter publication supabase_realtime add table public.products;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'categories'
+  ) then
+    alter publication supabase_realtime add table public.categories;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'sellers'
+  ) then
+    alter publication supabase_realtime add table public.sellers;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'orders'
+  ) then
+    alter publication supabase_realtime add table public.orders;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'settings'
+  ) then
+    alter publication supabase_realtime add table public.settings;
+  end if;
+end $$;
 `;
 

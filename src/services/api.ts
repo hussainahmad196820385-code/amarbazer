@@ -734,46 +734,14 @@ export const api = {
       const sellers = getLocalSellers();
       const deleted = getDeletedProductIds();
 
-      // Clean up deleted products from Supabase
-      if (deleted.size > 0) {
-        for (const delId of Array.from(deleted)) {
-          await supabaseDb.deleteProduct(delId).catch(() => {});
-        }
-      }
+      const res = await supabaseDb.syncAllData({
+        products: prods.filter(p => !deleted.has(p.id)),
+        categories: cats,
+        sellers: sellers,
+        deletedProductIds: Array.from(deleted)
+      });
 
-      // Upsert products to Supabase
-      let prodCount = 0;
-      if (prods && prods.length > 0) {
-        for (const p of prods) {
-          if (!deleted.has(p.id)) {
-            await supabaseDb.insertProduct(p).catch(() => {});
-            prodCount++;
-          }
-        }
-      }
-
-      // Upsert categories
-      let catCount = 0;
-      if (cats && cats.length > 0) {
-        for (const c of cats) {
-          await supabaseDb.insertCategory(c).catch(() => {});
-          catCount++;
-        }
-      }
-
-      // Upsert sellers
-      let sellerCount = 0;
-      if (sellers && sellers.length > 0) {
-        for (const s of sellers) {
-          await supabaseDb.insertSeller(s).catch(() => {});
-          sellerCount++;
-        }
-      }
-
-      return { 
-        success: true, 
-        message: `সফলভাবে ${prodCount}টি পণ্য, ${catCount}টি ক্যাটাগরি ও ${sellerCount}টি সেলার স্টোর Supabase-এ সিঙ্ক হয়েছে!` 
-      };
+      return res;
     } catch (err: any) {
       return { success: false, message: err.message || 'Supabase sync failed' };
     }

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { User, Product, Category, CartItem, Order, Language, CurrencyCode, Role, SystemSettings, Notification, ColorPalette, getProductUnitPrice, getBulkDiscountedPrice } from '../types';
 import { INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SYSTEM_SETTINGS } from '../data/initialData';
 import { api, getDeletedProductIds } from '../services/api';
-import { supabaseDb } from '../lib/supabase';
+import { supabaseDb, initSupabaseFromRemote } from '../lib/supabase';
 import { safeStorage } from '../lib/safeStorage';
 import { applyLiveLanguage } from '../services/languageService';
 import { applyLiveCurrency, formatCurrencyAmount } from '../services/currencyService';
@@ -697,6 +697,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
+    // Check if remote supabase config exists from server
+    initSupabaseFromRemote().then(() => {
+      refreshProducts();
+      refreshCategories();
+    });
+
     refreshProducts();
     refreshCategories();
     refreshSystemSettings();
@@ -709,7 +715,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.type === 'product_deleted' && data.id) {
+            if (data.type === 'batch_synced' || data.type === 'supabase_configured') {
+              refreshProducts();
+              refreshCategories();
+            } else if (data.type === 'product_deleted' && data.id) {
               const localSet = getDeletedProductIds();
               localSet.add(data.id);
               safeStorage.setItem('amarbazar_deleted_product_ids', JSON.stringify(Array.from(localSet)));

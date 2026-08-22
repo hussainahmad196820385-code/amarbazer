@@ -186,11 +186,13 @@ export const AdminDashboard: React.FC = () => {
       if (res.success) {
         setSyncMessage({
           success: true,
-          text: language === 'bn' 
-            ? `সুপারবেসে (Supabase) সফলভাবে ডাটা সিঙ্ক হয়েছে!`
-            : `Successfully synced to Supabase database!`
+          text: res.message || (language === 'bn' 
+            ? `সুপারবেসে (Supabase) সফলভাবে সব ডাটা সিঙ্ক হয়েছে!`
+            : `Successfully synced to Supabase database!`)
         });
         checkSupabaseStatus();
+        refreshProducts();
+        refreshCategories();
       } else {
         setSyncMessage({
           success: false,
