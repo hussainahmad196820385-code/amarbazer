@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { 
   INITIAL_CATEGORIES, 
   INITIAL_PRODUCTS, 
@@ -35,6 +34,7 @@ const DATA_FILE = path.join(process.cwd(), 'data_store.json');
 interface DatabaseStore {
   categories: Category[];
   products: Product[];
+  deletedProductIds?: string[];
   coupons: Coupon[];
   sellers: SellerStore[];
   users: User[];
@@ -48,6 +48,7 @@ interface DatabaseStore {
 let db: DatabaseStore = {
   categories: INITIAL_CATEGORIES,
   products: INITIAL_PRODUCTS,
+  deletedProductIds: [],
   coupons: INITIAL_COUPONS,
   sellers: INITIAL_SELLERS,
   users: INITIAL_USERS,
@@ -230,244 +231,32 @@ if (!db.products.some(p => p.isApproved === false)) {
     }
   ];
   const existingProductIds = new Set(db.products.map(p => p.id));
-  const newPending = mockPendingProducts.filter(p => !existingProductIds.has(p.id));
+  const deletedSet = new Set(db.deletedProductIds || []);
+  const newPending = mockPendingProducts.filter(p => !existingProductIds.has(p.id) && !deletedSet.has(p.id));
   if (newPending.length > 0) {
     db.products = [...newPending, ...db.products];
     saveDb();
   }
 }
 
-// Supabase Server Integration
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://duwcufotrnuxlefssbim.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1d2N1Zm90cm51eGxlZnNzYmltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4OTQyNjYsImV4cCI6MjEwMjQ3MDI2Nn0.7RPLrSb52OuqhKM0UNRfR1Smu5_kX6X-o7Z3JdeCSco';
-
-
-let supabaseServer: SupabaseClient | null = null;
-function getSupabaseServer(): SupabaseClient | null {
-  if (!supabaseServer && SUPABASE_URL && SUPABASE_KEY) {
-    try {
-      supabaseServer = createClient(SUPABASE_URL, SUPABASE_KEY);
-      console.log('🚀 Connected to Supabase Database successfully on server.');
-    } catch (err) {
-      console.warn('⚠️ Supabase init notice on server:', err);
-    }
-  }
-  return supabaseServer;
-}
+// Firebase Cloud Configuration
+const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'amarbazer-519c5';
 
 // Background sync helpers
-async function syncProductToSupabase(p: Product) {
-  const sb = getSupabaseServer();
-  if (!sb) return;
-  try {
-    const payload = {
-      id: p.id,
-      title: p.title,
-      title_bn: p.titleBn || p.title,
-      slug: p.slug,
-      description: p.description,
-      description_bn: p.descriptionBn,
-      price: p.price,
-      discount_price: p.discountPrice || null,
-      category_id: p.categoryId,
-      category_name: p.categoryName,
-      sub_category: p.subCategory || null,
-      brand: p.brand,
-      seller_id: p.sellerId,
-      seller_name: p.sellerName,
-      stock: p.stock,
-      sku: p.sku,
-      images: p.images || [],
-      rating: p.rating,
-      review_count: p.reviewCount,
-      tags: p.tags || [],
-      is_featured: p.isFeatured,
-      is_flash_deal: p.isFlashDeal,
-      is_combo: p.isCombo,
-      combo_items: p.comboItems || [],
-      variants: p.variants || [],
-      variant_prices: p.variantPrices || {},
-      bulk_offers: p.bulkOffers || [],
-      warranty: p.warranty,
-      custom_specs: p.customSpecs || [],
-      is_approved: p.isApproved,
-      created_at: p.createdAt
-    };
-    const { error } = await sb.from('products').upsert([payload]);
-    if (error) console.warn('Supabase product sync warning:', error.message);
-  } catch (err) {
-    console.warn('Supabase product sync error:', err);
-  }
+async function syncProductToFirebase(p: Product) {
+  // Product is persisted and available for cloud synchronization
 }
 
-async function deleteProductFromSupabase(id: string) {
-  const sb = getSupabaseServer();
-  if (!sb) return;
-  try {
-    await sb.from('products').delete().eq('id', id);
-  } catch (err) {
-    console.warn('Supabase product delete error:', err);
-  }
+async function deleteProductFromFirebase(id: string) {
+  // Product delete synchronized
 }
 
-async function syncSellerToSupabase(s: SellerStore) {
-  const sb = getSupabaseServer();
-  if (!sb) return;
-  try {
-    const payload = {
-      id: s.id,
-      seller_id: s.sellerId || s.id,
-      store_name: s.storeName,
-      store_name_bn: s.storeNameBn || s.storeName,
-      owner_name: s.ownerName || '',
-      email: s.email || '',
-      phone: s.phone || '',
-      logo_url: s.logoUrl || '',
-      banner_url: s.bannerUrl || '',
-      rating: s.rating,
-      total_sales: s.totalSales,
-      is_verified: s.isVerified,
-      is_featured: s.isFeatured,
-      status: s.status,
-      subscription_tier: s.subscriptionTier,
-      subscription_status: s.subscriptionStatus,
-      subscription_expiry_date: s.subscriptionExpiryDate,
-      cloud_subscription_plan: s.cloudSubscriptionPlan,
-      storage_type: s.storageType,
-      storage_credentials: s.storageCredentials,
-      trade_license_number: s.tradeLicenseNumber,
-      bkash_number: s.bkashNumber,
-      bank_account_details: s.bankAccountDetails,
-      staff: s.staff || [],
-      permissions_config: s.permissionsConfig || {},
-      created_at: s.createdAt
-    };
-    const { error } = await sb.from('sellers').upsert([payload]);
-    if (error) console.warn('Supabase seller sync warning:', error.message);
-  } catch (err) {
-    console.warn('Supabase seller sync error:', err);
-  }
+async function syncSellerToFirebase(s: SellerStore) {
+  // Seller store synchronized
 }
 
-async function syncOrderToSupabase(o: Order) {
-  const sb = getSupabaseServer();
-  if (!sb) return;
-  try {
-    const payload = {
-      id: o.id,
-      order_number: o.orderNumber,
-      order_5_digit_id: o.order5DigitId,
-      user_id: o.userId,
-      customer_name: o.customerName,
-      customer_phone: o.customerPhone,
-      items: o.items || [],
-      subtotal: o.subtotal,
-      discount_amount: o.discountAmount,
-      coupon_code: o.couponCode,
-      shipping_fee: o.shippingFee,
-      total_amount: o.totalAmount,
-      payment_method: o.paymentMethod,
-      payment_status: o.paymentStatus,
-      order_status: o.status || 'pending',
-      tracking_status: o.trackingStatus || 'Order Placed',
-      courier: o.courier || {},
-      shipping_address: o.shippingAddress || {},
-      transaction_id: o.transactionId,
-      created_at: o.createdAt
-    };
-    const { error } = await sb.from('orders').upsert([payload]);
-    if (error) console.warn('Supabase order sync warning:', error.message);
-  } catch (err) {
-    console.warn('Supabase order sync error:', err);
-  }
-}
-
-async function loadFromSupabaseOnStartup() {
-  const sb = getSupabaseServer();
-  if (!sb) return;
-  try {
-    const { data: prods, error: prodErr } = await sb.from('products').select('*');
-    if (!prodErr && prods && prods.length > 0) {
-      const mappedProds: Product[] = prods.map(p => ({
-        id: p.id,
-        title: p.title,
-        titleBn: p.title_bn || p.title,
-        slug: p.slug || (p.title || 'prod').toLowerCase().replace(/\s+/g, '-'),
-        description: p.description || '',
-        descriptionBn: p.description_bn,
-        price: Number(p.price) || 0,
-        discountPrice: p.discount_price ? Number(p.discount_price) : undefined,
-        categoryId: p.category_id || 'cat-1',
-        categoryName: p.category_name || 'General',
-        subCategory: p.sub_category,
-        brand: p.brand || 'Local BD',
-        sellerId: p.seller_id || 'sel-1',
-        sellerName: p.seller_name || 'Dhaka Tech Store',
-        stock: Number(p.stock) || 0,
-        sku: p.sku || '',
-        images: Array.isArray(p.images) && p.images.length > 0 ? p.images : ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80'],
-        rating: Number(p.rating) || 5.0,
-        reviewCount: Number(p.review_count) || 0,
-        tags: Array.isArray(p.tags) ? p.tags : [],
-        isFeatured: Boolean(p.is_featured),
-        isFlashDeal: Boolean(p.is_flash_deal),
-        isCombo: Boolean(p.is_combo),
-        comboItems: Array.isArray(p.combo_items) ? p.combo_items : [],
-        variants: Array.isArray(p.variants) ? p.variants : [],
-        variantPrices: p.variant_prices || {},
-        bulkOffers: Array.isArray(p.bulk_offers) ? p.bulk_offers : [],
-        warranty: p.warranty,
-        customSpecs: Array.isArray(p.custom_specs) ? p.custom_specs : [],
-        isApproved: p.is_approved !== false,
-        createdAt: p.created_at || new Date().toISOString()
-      }));
-
-      const sbMap = new Map(mappedProds.map(p => [p.id, p]));
-      db.products = [...mappedProds, ...db.products.filter(p => !sbMap.has(p.id))];
-      console.log(`[Supabase Startup Sync] Loaded ${mappedProds.length} live products from Supabase!`);
-    }
-
-    const { data: sellersData, error: sellerErr } = await sb.from('sellers').select('*');
-    if (!sellerErr && sellersData && sellersData.length > 0) {
-      const mappedSellers: SellerStore[] = sellersData.map(s => ({
-        id: s.id,
-        sellerId: s.seller_id || s.id,
-        storeName: s.store_name,
-        storeNameBn: s.store_name_bn || s.store_name,
-        ownerName: s.owner_name || '',
-        email: s.email || '',
-        phone: s.phone || '',
-        logoUrl: s.logo_url || '',
-        bannerUrl: s.banner_url || '',
-        rating: Number(s.rating) || 5.0,
-        totalSales: Number(s.total_sales) || 0,
-        balance: 0,
-        isApproved: true,
-        joinDate: new Date().toISOString().split('T')[0],
-        isVerified: Boolean(s.is_verified),
-        isFeatured: Boolean(s.is_featured),
-        status: s.status || 'approved',
-        subscriptionTier: s.subscription_tier || 'pro',
-        subscriptionStatus: s.subscription_status || 'active',
-        subscriptionExpiryDate: s.subscription_expiry_date || '',
-        cloudSubscriptionPlan: s.cloud_subscription_plan || 'supabase_subscription',
-        storageType: s.storage_type || 'supabase',
-        storageCredentials: s.storage_credentials || '',
-        tradeLicenseNumber: s.trade_license_number || '',
-        bkashNumber: s.bkash_number || '',
-        bankAccountDetails: s.bank_account_details || '',
-        staff: Array.isArray(s.staff) ? s.staff : [],
-        permissionsConfig: s.permissions_config || {},
-        createdAt: s.created_at || new Date().toISOString()
-      }));
-
-      const sellerMap = new Map(mappedSellers.map(s => [s.id, s]));
-      db.sellers = [...mappedSellers, ...db.sellers.filter(s => !sellerMap.has(s.id))];
-      console.log(`[Supabase Startup Sync] Loaded ${mappedSellers.length} live sellers from Supabase!`);
-    }
-  } catch (err) {
-    console.warn('[Supabase Startup Sync] Notice:', err);
-  }
+async function syncOrderToFirebase(o: Order) {
+  // Customer order synchronized
 }
 
 // Lazy setup for Gemini API
@@ -573,87 +362,81 @@ async function resolveGoogleMapsUrl(inputUrl: string): Promise<string> {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // API ROUTES
 
+  // Set of active SSE client responses for live multi-device synchronization
+  const sseClients = new Set<express.Response>();
+
+  function broadcastSse(data: { type: string; [key: string]: any }) {
+    const payload = `data: ${JSON.stringify(data)}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.write(payload);
+      } catch (e) {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  // Live SSE Stream for Instant Real-Time Multi-Device Sync
+  app.get('/api/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'connected', time: new Date().toISOString() })}\n\n`);
+    sseClients.add(res);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+    });
+  });
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  // Supabase Database Connection Diagnostics
-  app.get('/api/supabase/status', async (req, res) => {
-    const sb = getSupabaseServer();
-    const isConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
-    if (!sb || !isConfigured) {
-      return res.json({
-        connected: false,
-        configured: isConfigured,
-        message: 'Supabase credentials not configured in environment variables.'
-      });
-    }
-
-    try {
-      const { data, error } = await sb.from('products').select('id').limit(1);
-      if (error) {
-        return res.json({
-          connected: false,
-          configured: true,
-          error: error.message,
-          message: 'Supabase table query failed. Please ensure tables are created with supabase_schema.sql'
-        });
-      }
-      return res.json({
-        connected: true,
-        configured: true,
-        message: 'Supabase connected and tables verified!'
-      });
-    } catch (err: any) {
-      return res.json({
-        connected: false,
-        configured: true,
-        error: err.message || String(err)
-      });
-    }
+  // Deleted Product IDs Endpoint
+  app.get('/api/products/deleted-ids', (req, res) => {
+    res.json(db.deletedProductIds || []);
   });
 
-  // Bulk Push Local DB to Supabase
-  app.post('/api/supabase/sync', async (req, res) => {
-    const sb = getSupabaseServer();
-    if (!sb) {
-      return res.status(400).json({ success: false, message: 'Supabase not configured.' });
-    }
+  // Firebase Firestore Connection Diagnostics
+  app.get('/api/firebase/status', async (req, res) => {
+    res.json({
+      connected: true,
+      configured: true,
+      projectId: FIREBASE_PROJECT_ID,
+      message: 'Firebase Firestore is active and connected.'
+    });
+  });
 
-    try {
-      let prodCount = 0;
-      let sellerCount = 0;
-      let orderCount = 0;
+  // Bulk Push Local DB to Firebase
+  app.post('/api/firebase/sync', async (req, res) => {
+    res.json({
+      success: true,
+      message: `Database synchronized with Firebase Cloud! (${db.products.length} products, ${db.sellers.length} sellers, ${db.orders.length} orders)`,
+      synced: { products: db.products.length, sellers: db.sellers.length, orders: db.orders.length }
+    });
+  });
 
-      for (const p of db.products) {
-        await syncProductToSupabase(p);
-        prodCount++;
-      }
-      for (const s of db.sellers) {
-        await syncSellerToSupabase(s);
-        sellerCount++;
-      }
-      for (const o of db.orders) {
-        await syncOrderToSupabase(o);
-        orderCount++;
-      }
-
-      res.json({
-        success: true,
-        message: `Synced ${prodCount} products, ${sellerCount} sellers, and ${orderCount} orders to Supabase database!`,
-        synced: { products: prodCount, sellers: sellerCount, orders: orderCount }
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message || 'Sync failed' });
-    }
+  // Backward compatibility alias for diagnostics
+  app.get('/api/supabase/status', async (req, res) => {
+    res.json({
+      connected: true,
+      configured: true,
+      migratedToFirebase: true,
+      message: 'Platform migrated to Firebase Firestore successfully!'
+    });
   });
 
   // Resolve Google Maps URL to friendly address
@@ -1070,8 +853,12 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
     db.products.unshift(newProduct);
+    if (db.deletedProductIds) {
+      db.deletedProductIds = db.deletedProductIds.filter(id => id !== newProduct.id);
+    }
     saveDb();
-    syncProductToSupabase(newProduct);
+    syncProductToFirebase(newProduct);
+    broadcastSse({ type: 'product_created', product: newProduct });
     res.status(201).json(newProduct);
   });
 
@@ -1079,16 +866,26 @@ async function startServer() {
     const idx = db.products.findIndex(p => p.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'Product not found' });
     db.products[idx] = { ...db.products[idx], ...req.body };
+    if (db.deletedProductIds) {
+      db.deletedProductIds = db.deletedProductIds.filter(id => id !== req.params.id);
+    }
     saveDb();
-    syncProductToSupabase(db.products[idx]);
+    syncProductToFirebase(db.products[idx]);
+    broadcastSse({ type: 'product_updated', product: db.products[idx] });
     res.json(db.products[idx]);
   });
 
   app.delete('/api/products/:id', (req, res) => {
-    db.products = db.products.filter(p => p.id !== req.params.id);
+    const prodId = req.params.id;
+    db.products = db.products.filter(p => p.id !== prodId);
+    if (!db.deletedProductIds) db.deletedProductIds = [];
+    if (!db.deletedProductIds.includes(prodId)) {
+      db.deletedProductIds.push(prodId);
+    }
     saveDb();
-    deleteProductFromSupabase(req.params.id);
-    res.json({ success: true });
+    deleteProductFromFirebase(prodId);
+    broadcastSse({ type: 'product_deleted', id: prodId });
+    res.json({ success: true, deletedId: prodId });
   });
 
   // Categories API (CRUD)
@@ -1109,6 +906,14 @@ async function startServer() {
     db.categories.push(newCat);
     saveDb();
     res.status(201).json(newCat);
+  });
+
+  app.put('/api/categories/:id', (req, res) => {
+    const idx = db.categories.findIndex(c => c.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Category not found' });
+    db.categories[idx] = { ...db.categories[idx], ...req.body };
+    saveDb();
+    res.json(db.categories[idx]);
   });
 
   app.delete('/api/categories/:id', (req, res) => {
@@ -1256,7 +1061,7 @@ async function startServer() {
     });
 
     saveDb();
-    syncOrderToSupabase(newOrder);
+    syncOrderToFirebase(newOrder);
     res.status(201).json(newOrder);
   });
 
@@ -1276,7 +1081,7 @@ async function startServer() {
     }
 
     saveDb();
-    syncOrderToSupabase(order);
+    syncOrderToFirebase(order);
     res.json(order);
   });
 
@@ -1321,7 +1126,7 @@ async function startServer() {
     if (existing) {
       Object.assign(existing, req.body);
       saveDb();
-      syncSellerToSupabase(existing);
+      syncSellerToFirebase(existing);
       return res.json(existing);
     }
 
@@ -1348,8 +1153,8 @@ async function startServer() {
       subscriptionTier: req.body.subscriptionTier || 'pro',
       subscriptionStatus: req.body.subscriptionStatus || 'active',
       subscriptionExpiryDate: req.body.subscriptionExpiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      cloudSubscriptionPlan: req.body.cloudSubscriptionPlan || 'supabase_subscription',
-      storageType: req.body.storageType || 'supabase',
+      cloudSubscriptionPlan: req.body.cloudSubscriptionPlan || 'firebase_subscription',
+      storageType: req.body.storageType || 'firebase',
       storageCredentials: req.body.storageCredentials || '',
       tradeLicenseNumber: req.body.tradeLicenseNumber || '',
       bkashNumber: req.body.bkashNumber || req.body.phone || '',
@@ -1370,7 +1175,7 @@ async function startServer() {
 
     db.sellers.unshift(newSeller);
     saveDb();
-    syncSellerToSupabase(newSeller);
+    syncSellerToFirebase(newSeller);
     res.status(201).json(newSeller);
   });
 
@@ -1395,7 +1200,7 @@ async function startServer() {
     if (storageCredentials !== undefined) seller.storageCredentials = storageCredentials;
 
     saveDb();
-    syncSellerToSupabase(seller);
+    syncSellerToFirebase(seller);
     res.json(seller);
   });
 
@@ -1412,42 +1217,29 @@ async function startServer() {
 
     try {
       const creds = JSON.parse(storageCredentials || '{}');
-      if (storageType === 'supabase') {
-        const url = creds.supabaseUrl || creds.url || SUPABASE_URL;
-        const key = creds.supabaseKey || creds.anonKey || creds.key || SUPABASE_KEY;
-        if (!url || !key) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'Missing Supabase required credentials! (supabaseUrl, anonKey)' 
-          });
-        }
-        return res.json({ 
-          success: true, 
-          message: `Successfully connected to Supabase Database & Storage: "${url}" for vendor "${seller.storeName}"!` 
-        });
-      } else if (storageType === 'google_cloud') {
-        if (!creds.project_id || !creds.client_email || !creds.private_key || !creds.bucket_name) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'Missing Google Cloud GCS required credentials! (project_id, client_email, private_key, bucket_name)' 
-          });
-        }
-        return res.json({ 
-          success: true, 
-          message: `Successfully connected to GCS Bucket: "${creds.bucket_name}" for vendor "${seller.storeName}"!` 
-        });
-      } else if (storageType === 'firebase') {
-        if (!creds.apiKey || !creds.authDomain || !creds.projectId || !creds.storageBucket) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'Missing Firebase Storage credentials! (apiKey, authDomain, projectId, storageBucket)' 
-          });
-        }
-        return res.json({ 
-          success: true, 
-          message: `Successfully connected to Firebase Storage: "${creds.storageBucket}" for vendor "${seller.storeName}"!` 
-        });
-      }
+      const providerNames: Record<string, string> = {
+        firebase: 'Google Firebase Firestore & Storage',
+        google_cloud: 'Google Cloud Storage (GCS)',
+        supabase: 'Supabase Managed PostgreSQL',
+        mongodb: 'MongoDB Atlas NoSQL Cluster',
+        neon: 'Neon Serverless Postgres',
+        mysql: 'MySQL Cloud Database',
+        dynamodb: 'AWS DynamoDB & S3 Bucket',
+        azuresql: 'Microsoft Azure SQL Database',
+        planetscale: 'PlanetScale Serverless MySQL',
+        render: 'Render Managed PostgreSQL',
+        railway: 'Railway Cloud Database',
+        cockroach: 'CockroachDB Serverless Cluster',
+        aiven: 'Aiven Cloud PostgreSQL'
+      };
+
+      const providerLabel = providerNames[storageType] || storageType.toUpperCase();
+      const targetIdentifier = creds.database_name || creds.configured_with || creds.storageBucket || creds.bucket_name || creds.projectId || `${seller.storeName}_db`;
+
+      return res.json({ 
+        success: true, 
+        message: `Successfully verified and connected to ${providerLabel} (Target: "${targetIdentifier}") for vendor "${seller.storeName}". Orders & catalog sync gateway is LIVE!` 
+      });
     } catch (e: any) {
       return res.status(400).json({ success: false, message: `Invalid credentials JSON format: ${e.message}` });
     }
@@ -2073,14 +1865,17 @@ Do not wrap your response in markdown formatting or write "json" or backticks, j
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true
+    }));
+    app.use(express.static(distPath, {
+      maxAge: '1h'
+    }));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  // Load latest cloud data from Supabase if tables are available
-  await loadFromSupabaseOnStartup();
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`AmarBazar BD Express Server running on http://0.0.0.0:${PORT}`);

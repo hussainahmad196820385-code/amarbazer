@@ -135,11 +135,7 @@ export const BottomNavigation: React.FC = () => {
         {/* Tab 4: Messages */}
         <button
           onClick={() => {
-            if (currentUser) {
-              handleTabClick('customer_messages');
-            } else {
-              setIsAuthOpen(true);
-            }
+            handleTabClick('customer_messages');
           }}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all relative ${
             isTabActive('customer_messages') 
@@ -154,7 +150,7 @@ export const BottomNavigation: React.FC = () => {
           <span className="text-[9px] tracking-tight">
             {language === 'bn' ? 'মেসেজ' : 'Messages'}
           </span>
-          {currentUser && isTabActive('customer_messages') && (
+          {isTabActive('customer_messages') && (
             <span className="absolute bottom-0 w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
           )}
         </button>

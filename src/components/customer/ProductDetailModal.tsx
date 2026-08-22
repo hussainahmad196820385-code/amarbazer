@@ -186,8 +186,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleWhatsAppOrder = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://amarbazar.bd';
     const link = `${origin}/?product=${product.id}`;
-    const text = `🛍️ *AmarBazar BD Order Request*\n\nProduct: *${productTitle}*\nPrice: ৳${currentPrice}\nQuantity: ${quantity}\nVariants: ${JSON.stringify(selectedVariants)}\nLink: ${link}\n\nI want to confirm this order!`;
-    const waUrl = `https://api.whatsapp.com/send?phone=8801700000000&text=${encodeURIComponent(text)}`;
+    const configuredPhone = (typeof window !== 'undefined' && localStorage.getItem('amarbazar_whatsapp_number')) 
+      ? localStorage.getItem('amarbazar_whatsapp_number')!.replace(/[^0-9]/g, '')
+      : '8801712345678';
+    
+    const formattedVariants = Object.entries(selectedVariants).length > 0 
+      ? Object.entries(selectedVariants).map(([k, v]) => `${k}: ${v}`).join(', ') 
+      : (language === 'bn' ? 'সাধারণ' : 'Standard');
+
+    const text = language === 'bn'
+      ? `🛍️ *আমারবাজার বিডি - নতুন অর্ডার অনুরোধ*\n\n📦 *পণ্য:* ${productTitle}\n💰 *একক মূল্য:* ৳${bulkUnitPrice}\n🔢 *পরিমাণ:* ${quantity} টি\n🎨 *ভেরিয়েন্ট:* ${formattedVariants}\n💵 *মোট মূল্য:* ৳${bulkUnitPrice * quantity}\n🔗 *লিংক:* ${link}\n\nআমি এই পণ্যটি অর্ডার করতে চাই। ডেলিভারির প্রক্রিয়া জানিয়ে দিন।`
+      : `🛍️ *AmarBazar BD Order Request*\n\n📦 *Product:* ${productTitle}\n💰 *Unit Price:* ৳${bulkUnitPrice}\n🔢 *Quantity:* ${quantity}\n🎨 *Variants:* ${formattedVariants}\n💵 *Subtotal:* ৳${bulkUnitPrice * quantity}\n🔗 *Link:* ${link}\n\nI want to confirm this order. Please advise on delivery.`;
+
+    const waUrl = `https://wa.me/${configuredPhone}?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   };
 

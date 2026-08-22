@@ -83,6 +83,12 @@ html, body, #root {
   
   #printable-slip-a4, 
   #printable-slip-a4 *,
+  #printable-slip-a5, 
+  #printable-slip-a5 *,
+  #printable-slip-pos80, 
+  #printable-slip-pos80 *,
+  #printable-slip-pos58, 
+  #printable-slip-pos58 *,
   #printable-slip-pos, 
   #printable-slip-pos *,
   #printable-slip-label, 
@@ -91,23 +97,55 @@ html, body, #root {
   }
 
   #printable-slip-a4,
+  #printable-slip-a5,
+  #printable-slip-pos80,
+  #printable-slip-pos58,
   #printable-slip-pos,
   #printable-slip-label {
     position: absolute;
     left: 0;
     top: 0;
-    width: 100% !important;
-    max-width: 100% !important;
     margin: 0 !important;
-    padding: 12px !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
-    border: none !important;
+  }
+
+  #printable-slip-a4 {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 12mm !important;
+  }
+
+  #printable-slip-a5 {
+    width: 100% !important;
+    max-width: 148mm !important;
+    padding: 6mm !important;
+  }
+
+  #printable-slip-pos80,
+  #printable-slip-pos {
+    width: 78mm !important;
+    max-width: 78mm !important;
+    padding: 2mm 3mm !important;
+    font-size: 11px !important;
+  }
+
+  #printable-slip-pos58 {
+    width: 54mm !important;
+    max-width: 54mm !important;
+    padding: 1mm 2mm !important;
+    font-size: 9.5px !important;
+  }
+
+  #printable-slip-label {
+    width: 100mm !important;
+    max-width: 100mm !important;
+    padding: 4mm !important;
   }
 
   @page {
-    margin: 8mm;
+    margin: 4mm;
   }
 }
 

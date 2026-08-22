@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Helper Primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'hussainahmad1057nvc@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+    }
+
+    // Products Collection (Public Catalog, Seller & Admin Management)
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isValidId(productId) &&
+        incoming().title is string && incoming().title.size() <= 255 &&
+        incoming().price is number && incoming().price >= 0;
+      allow update: if isValidId(productId) &&
+        incoming().title is string && incoming().title.size() <= 255;
+      allow delete: if isValidId(productId);
+    }
+
+    // Deleted Products Sync Tracker (Ensures deletions propagate instantly across all devices)
+    match /deleted_products/{productId} {
+      allow read: if true;
+      allow create, update: if isValidId(productId);
+      allow delete: if isValidId(productId);
+    }
+
+    // Categories Collection
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isValidId(categoryId) &&
+        incoming().name is string && incoming().name.size() <= 128;
+      allow delete: if isValidId(categoryId);
+    }
+
+    // Deleted Categories Sync Tracker
+    match /deleted_categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isValidId(categoryId);
+      allow delete: if isValidId(categoryId);
+    }
+
+    // Sellers / Vendor Stores
+    match /sellers/{sellerId} {
+      allow read: if true;
+      allow create, update: if isValidId(sellerId) &&
+        incoming().storeName is string && incoming().storeName.size() <= 255;
+      allow delete: if isValidId(sellerId);
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if isValidId(orderId) &&
+        incoming().totalAmount is number && incoming().totalAmount >= 0;
+      allow update: if isValidId(orderId);
+      allow delete: if isValidId(orderId);
+    }
+
+    // Platform Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isValidId(settingId);
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId);
+      allow delete: if isValidId(userId);
+    }
+  }
+}

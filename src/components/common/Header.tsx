@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, Search, Heart, ShoppingCart, User as UserIcon, 
   Globe, Sun, Moon, Bell, Sparkles, Store, ShieldCheck, ChevronDown, 
-  LogOut, PhoneCall, Truck, Tag, HelpCircle, Menu, X, MapPin, Smartphone, Map, CheckCircle
+  LogOut, PhoneCall, Truck, Tag, HelpCircle, Menu, X, MapPin, Smartphone, Map, CheckCircle, Share2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getTranslation } from '../../translations';
@@ -17,7 +17,7 @@ export const Header: React.FC = () => {
     setIsCartOpen, setIsAuthOpen, setIsAiOpen, setTrackingOrderId,
     searchQuery, setSearchQuery, selectedCategory, setSelectedCategory,
     categories, isCustomerOnlyMode, setIsCustomerOnlyMode,
-    activeCampaignTab, setActiveCampaignTab
+    activeCampaignTab, setActiveCampaignTab, products, setSharingProduct
   } = useApp();
 
   const [campaignList, setCampaignList] = useState<any[]>(() => {
@@ -473,7 +473,27 @@ export const Header: React.FC = () => {
             </div>
 
             {/* Right Info Links */}
-            <div className="flex items-center space-x-4 shrink-0 text-[11px] font-black">
+            <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 text-[11px] font-black">
+              {/* Store & App Share Button */}
+              <button 
+                onClick={() => {
+                  if (products && products.length > 0) {
+                    setSharingProduct(products[0]);
+                  } else if (navigator.share) {
+                    navigator.share({
+                      title: 'AmarBazar BD',
+                      text: language === 'bn' ? 'অমরবাজার - খাঁটি দেশি পণ্য ও অনলাইন শপিং' : 'AmarBazar BD - Online Store',
+                      url: window.location.origin
+                    }).catch(() => {});
+                  }
+                }}
+                className="flex items-center space-x-1.5 px-2.5 py-1 bg-red-50 dark:bg-red-950/40 text-[#da1c24] dark:text-red-400 hover:bg-red-100 rounded-lg transition border border-red-200 dark:border-red-900/50 cursor-pointer shadow-xs"
+                title={language === 'bn' ? 'স্টোর ও পণ্য শেয়ার করুন' : 'Share Store & Products'}
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>{language === 'bn' ? 'শেয়ার' : 'Share'}</span>
+              </button>
+
               <button 
                 onClick={() => {
                   setSelectedCategory(null);

@@ -8,6 +8,7 @@ import {
   Sparkles, CheckSquare, Heart, ArrowLeft, Plus, Camera, FileText, Download
 } from 'lucide-react';
 import { User as AppUser, Role } from '../../types';
+import { FacebookMessengerWidget } from '../common/FacebookMessengerWidget';
 
 // Helper to generate a 100% valid, playable synthesizer sound WAV Data URL
 const generateMockAudioUrl = () => {
@@ -298,6 +299,7 @@ export const CustomerMessagesPanel: React.FC = () => {
   });
 
   const [activeThreadId, setActiveThreadId] = useState<string>('');
+  const [activeChannelTab, setActiveChannelTab] = useState<'chats' | 'whatsapp' | 'messenger'>('chats');
   const [inputText, setInputText] = useState<string>('');
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
@@ -1052,7 +1054,81 @@ export const CustomerMessagesPanel: React.FC = () => {
   return (
     <div id="messages-messenger-panel" className="max-w-7xl mx-auto h-full flex-1 min-h-0 relative flex flex-col w-full">
       
-      {/* 2. CORE MESSENGER ENGINE CONTAINER */}
+      {/* 1. CHANNEL SELECTION BAR (In-App Chats / WhatsApp / Messenger) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm shrink-0">
+        <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setActiveChannelTab('chats')}
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeChannelTab === 'chats'
+                ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>{language === 'bn' ? 'ইন-অ্যাপ মেসেজেস' : 'In-App Direct Chats'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveChannelTab('whatsapp')}
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeChannelTab === 'whatsapp'
+                ? 'bg-emerald-600 text-white font-black shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>{language === 'bn' ? '🟢 হোয়াটসঅ্যাপ লাইভ ও ১-ক্লিক অর্ডার' : '🟢 WhatsApp Live & Order'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveChannelTab('messenger')}
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeChannelTab === 'messenger'
+                ? 'bg-blue-600 text-white font-black shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
+            <span>{language === 'bn' ? '🔵 ফেসবুক মেসেঞ্জার সাপোর্ট' : '🔵 Facebook Messenger'}</span>
+          </button>
+        </div>
+
+        {activeChannelTab !== 'chats' && (
+          <button
+            type="button"
+            onClick={() => setActiveChannelTab('chats')}
+            className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer ml-auto"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>{language === 'bn' ? 'ইনবক্সে ফিরে যান' : 'Back to Inbox'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* 2. WHATSAPP EMBEDDED TAB */}
+      {activeChannelTab === 'whatsapp' && (
+        <div className="w-full flex-1 flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 sm:p-5 shadow-lg">
+            <FacebookMessengerWidget embedded={true} initialChannel="whatsapp" isFloating={false} />
+          </div>
+        </div>
+      )}
+
+      {/* 3. MESSENGER EMBEDDED TAB */}
+      {activeChannelTab === 'messenger' && (
+        <div className="w-full flex-1 flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 sm:p-5 shadow-lg">
+            <FacebookMessengerWidget embedded={true} initialChannel="messenger" isFloating={false} />
+          </div>
+        </div>
+      )}
+
+      {/* 4. CORE MESSENGER ENGINE CONTAINER (In-App Chats) */}
+      {activeChannelTab === 'chats' && (
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 border-0 lg:border border-slate-200 dark:border-slate-800 rounded-none lg:rounded-3xl shadow-none lg:shadow-md overflow-hidden bg-white dark:bg-slate-950 lg:h-[680px] h-full flex-1 min-h-0 relative">
         
         {/* SIDEBAR LIST (Takes 1 Column) */}
@@ -1129,6 +1205,26 @@ export const CustomerMessagesPanel: React.FC = () => {
                 }`}
               >
                 {language === 'bn' ? 'এডমিন' : 'Admins'}
+              </button>
+            </div>
+
+            {/* Quick External Channel Switch Shortcuts */}
+            <div className="pt-1 grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveChannelTab('whatsapp')}
+                className="flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold transition cursor-pointer"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span className="truncate">{language === 'bn' ? '🟢 WhatsApp' : '🟢 WhatsApp'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveChannelTab('messenger')}
+                className="flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-700 dark:text-blue-400 text-[10px] font-bold transition cursor-pointer"
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0"></span>
+                <span className="truncate">{language === 'bn' ? '🔵 Messenger' : '🔵 Messenger'}</span>
               </button>
             </div>
           </div>
@@ -1934,6 +2030,7 @@ export const CustomerMessagesPanel: React.FC = () => {
         )}
 
       </div>
+      )}
 
       {/* 3. AUDIO / VIDEO CALLING SCREEN SIMULATION OVERLAY */}
       {activeCall?.isOpen && (

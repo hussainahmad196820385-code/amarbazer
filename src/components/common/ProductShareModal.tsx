@@ -3,7 +3,7 @@ import {
   X, Share2, Copy, Check, QrCode, MessageSquare, 
   ExternalLink, Sparkles, Download, Smartphone, 
   Send, Globe, Mail, MessageCircle, Info, ShieldCheck, 
-  Tag, Star, CheckCircle2, Sliders, RefreshCw
+  Tag, Star, CheckCircle2, Sliders, RefreshCw, Instagram
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useApp } from '../../context/AppContext';
@@ -24,7 +24,10 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
   const [activeTab, setActiveTab] = useState<'channels' | 'preview' | 'qrcode' | 'customize'>('channels');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [copiedImage, setCopiedImage] = useState(false);
+  const [isSharingImage, setIsSharingImage] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewPlatform, setPreviewPlatform] = useState<'whatsapp' | 'facebook' | 'twitter'>('whatsapp');
   
   // Custom message options
@@ -33,6 +36,11 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
   const [includeDescription, setIncludeDescription] = useState(true);
   const [includeDelivery, setIncludeDelivery] = useState(true);
   const [customNotes, setCustomNotes] = useState('');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -153,9 +161,6 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
     }
   };
 
-  const [copiedImage, setCopiedImage] = useState(false);
-  const [isSharingImage, setIsSharingImage] = useState(false);
-
   // Helper to fetch image as File for Native Web Share
   const getProductImageFile = async (): Promise<File | null> => {
     try {
@@ -262,23 +267,42 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
 
   // Direct Social Share Handlers
   const handleShareFacebook = () => {
-    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`;
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
     window.open(fbUrl, '_blank', 'noopener,noreferrer,width=600,height=500');
   };
 
-  const handleShareMessenger = () => {
+  const handleShareMessenger = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        showToast(language === 'bn' ? 'মেসেজ ও পণ্যের লিংক কপি হয়েছে! মেসেঞ্জারে পেস্ট করুন।' : 'Product message & link copied! Paste into Messenger.');
+      }
+    } catch (e) {
+      console.log('Clipboard copy err:', e);
+    }
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
-      window.location.href = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`;
+      window.open(`fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`, '_blank');
     } else {
-      const messengerUrl = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareUrl)}&app_id=291494419107518&redirect_uri=${encodeURIComponent(shareUrl)}`;
-      window.open(messengerUrl, '_blank', 'noopener,noreferrer,width=600,height=500');
+      window.open(`https://www.facebook.com/messages/t/`, '_blank', 'noopener,noreferrer,width=650,height=600');
     }
   };
 
+  const handleShareInstagram = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        showToast(language === 'bn' ? 'পণ্যের আকর্ষণীয় বিবরণ ও লিংক কপি হয়েছে! ইনস্টাগ্রামে পোস্ট/ডিএম করুন।' : 'Product caption & link copied! Paste into Instagram.');
+      }
+    } catch (e) {
+      console.log('Clipboard copy err:', e);
+    }
+    window.open('https://www.instagram.com/direct/inbox/', '_blank', 'noopener,noreferrer');
+  };
+
   const handleShareWhatsApp = () => {
-    // Include direct image link and full site order link so WhatsApp renders rich image preview card
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+    // WhatsApp Universal web/app link that auto unfurls message with preview
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -306,12 +330,12 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
   const handleShareEmail = () => {
     const subject = encodeURIComponent(`${language === 'bn' ? 'অমরবাজার থেকে আকর্ষণীয় পণ্য:' : 'Check out this product on AmarBazar BD:'} ${productTitle}`);
     const body = encodeURIComponent(shareText);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
   };
 
   const handleShareSMS = () => {
     const smsBody = encodeURIComponent(`${productTitle} - ৳${currentPrice} | ${shareUrl}`);
-    window.location.href = `sms:?body=${smsBody}`;
+    window.open(`sms:?body=${smsBody}`, '_blank');
   };
 
   const downloadQrCode = () => {
@@ -546,7 +570,21 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
                     </div>
                     <span className="text-xs font-black">Messenger</span>
                     <span className="text-[9px] opacity-75 font-medium group-hover:text-white">
-                      {language === 'bn' ? 'বন্ধুকে পাঠান' : 'Direct Message'}
+                      {language === 'bn' ? 'মেসেজ পাঠান' : 'Direct Message'}
+                    </span>
+                  </button>
+
+                  {/* Instagram */}
+                  <button
+                    onClick={handleShareInstagram}
+                    className="p-3 bg-[#E1306C]/10 hover:bg-linear-to-tr hover:from-[#F58529] hover:via-[#DD2A7B] hover:to-[#8134AF] text-[#E1306C] hover:text-white border border-[#E1306C]/30 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer group shadow-xs hover:scale-102 active:scale-98"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-linear-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                      <Instagram className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-black">Instagram</span>
+                    <span className="text-[9px] opacity-75 font-medium group-hover:text-white">
+                      {language === 'bn' ? 'ডিএম ও স্টোরি' : 'DM & Stories'}
                     </span>
                   </button>
 
@@ -589,20 +627,6 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
                     <span className="text-xs font-black">LinkedIn</span>
                     <span className="text-[9px] opacity-75 font-medium group-hover:text-white">
                       {language === 'bn' ? 'প্রফেশনাল ফিড' : 'Feed Post'}
-                    </span>
-                  </button>
-
-                  {/* Pinterest */}
-                  <button
-                    onClick={handleSharePinterest}
-                    className="p-3 bg-[#BD081C]/10 hover:bg-[#BD081C] text-[#BD081C] hover:text-white border border-[#BD081C]/30 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer group shadow-xs hover:scale-102 active:scale-98"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-[#BD081C] text-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                      <span className="font-black text-xs font-sans">P</span>
-                    </div>
-                    <span className="text-xs font-black">Pinterest</span>
-                    <span className="text-[9px] opacity-75 font-medium group-hover:text-white">
-                      {language === 'bn' ? 'পিন সেভ করুন' : 'Pin Idea'}
                     </span>
                   </button>
 
@@ -1028,6 +1052,14 @@ export const ProductShareModal: React.FC<ProductShareModalProps> = ({
           )}
 
         </div>
+
+        {/* Toast Notification Alert */}
+        {toastMessage && (
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2.5 rounded-full shadow-2xl border border-white/20 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
 
         {/* Footer info banner */}
         <div className="px-5 py-3 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 shrink-0">

@@ -9,7 +9,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { hasPermission } from '../../lib/permissions';
-import { Product, Order, WithdrawalRequest, SellerStore } from '../../types';
+import { Product, Order, WithdrawalRequest, SellerStore, ProductVariant, VariantPriceDetails } from '../../types';
 import { getTranslation } from '../../translations';
 import { StoreDirectory } from '../dashboard/StoreDirectory';
 import { InventoryWorkspace } from '../dashboard/InventoryWorkspace';
@@ -20,7 +20,9 @@ import { storageManager } from '../../lib/storageManager';
 export const SellerDashboard: React.FC = () => {
   const { 
     currentUser, setCurrentUser, activeRole, language, products, categories, 
-    refreshProducts, systemSettings, sellerActiveTab, setSellerActiveTab 
+    refreshProducts, deleteProduct: appDeleteProduct, createProduct: appCreateProduct,
+    updateProduct: appUpdateProduct,
+    systemSettings, sellerActiveTab, setSellerActiveTab 
   } = useApp();
 
   const effectiveUser = currentUser?.role === 'customer' && activeRole !== 'customer' 
@@ -104,7 +106,7 @@ export const SellerDashboard: React.FC = () => {
 
   // Subscription simulated checkout state
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
-  const [selectedCheckoutPlan, setSelectedCheckoutPlan] = useState<'starter' | 'business' | 'enterprise' | null>(null);
+  const [selectedCheckoutPlan, setSelectedCheckoutPlan] = useState<'starter' | 'business' | 'enterprise' | 'gcs_subscription' | 'firebase_subscription' | string | null>(null);
   const [checkoutMethod, setCheckoutMethod] = useState<'bkash' | 'nagad' | 'rocket'>('bkash');
   const [checkoutPhone, setCheckoutPhone] = useState('01700000000');
   const [checkoutOtp, setCheckoutOtp] = useState('123456');
@@ -143,15 +145,15 @@ export const SellerDashboard: React.FC = () => {
   const [newWarranty, setNewWarranty] = useState('No Warranty');
 
   // Variant Pricing & Bulk Offers (Add Product)
-  const [newVariants, setNewVariants] = useState<{ name: string; options: string[] }[]>([]);
-  const [newVariantPrices, setNewVariantPrices] = useState<Record<string, number>>({});
+  const [newVariants, setNewVariants] = useState<ProductVariant[]>([]);
+  const [newVariantPrices, setNewVariantPrices] = useState<Record<string, number | VariantPriceDetails>>({});
   const [newBulkOffers, setNewBulkOffers] = useState<{ minQuantity: number; discountPercent?: number; discountAmount?: number }[]>([]);
   const [newVarGroupName, setNewVarGroupName] = useState('');
   const [newVarOptionsInput, setNewVarOptionsInput] = useState('');
 
   // Variant Pricing & Bulk Offers (Edit Product)
-  const [editVariants, setEditVariants] = useState<{ name: string; options: string[] }[]>([]);
-  const [editVariantPrices, setEditVariantPrices] = useState<Record<string, number>>({});
+  const [editVariants, setEditVariants] = useState<ProductVariant[]>([]);
+  const [editVariantPrices, setEditVariantPrices] = useState<Record<string, number | VariantPriceDetails>>({});
   const [editBulkOffers, setEditBulkOffers] = useState<{ minQuantity: number; discountPercent?: number; discountAmount?: number }[]>([]);
   const [editVarGroupName, setEditVarGroupName] = useState('');
   const [editVarOptionsInput, setEditVarOptionsInput] = useState('');
@@ -176,7 +178,7 @@ export const SellerDashboard: React.FC = () => {
   const [isStoreOpen, setIsStoreOpen] = useState(true);
 
   // Dynamic Cloud Storage states
-  const [settingsStorageType, setSettingsStorageType] = useState<'central' | 'google_cloud' | 'firebase'>('central');
+  const [settingsStorageType, setSettingsStorageType] = useState<'central' | 'google_cloud' | 'firebase' | string>('central');
   const [settingsStorageCredentials, setSettingsStorageCredentials] = useState('');
   const [isTestingStorage, setIsTestingStorage] = useState(false);
   const [storageTestMessage, setStorageTestMessage] = useState<{ success: boolean; text: string } | null>(null);
@@ -225,6 +227,11 @@ export const SellerDashboard: React.FC = () => {
   const [dbSetupStep, setDbSetupStep] = useState<'info' | 'configure' | 'connecting' | 'success'>('info');
   const [dbSetupGmail, setDbSetupGmail] = useState('');
   const [dbSetupPassword, setDbSetupPassword] = useState('');
+  const [dbSetupApiKey, setDbSetupApiKey] = useState('');
+  const [dbSetupProjectUrl, setDbSetupProjectUrl] = useState('');
+  const [dbSetupBucketName, setDbSetupBucketName] = useState('');
+  const [dbSetupRawConfig, setDbSetupRawConfig] = useState('');
+  const [dbSetupConfigMode, setDbSetupConfigMode] = useState<'fields' | 'raw'>('fields');
 
   // Seller Password Change states
   const [sellerOldPassword, setSellerOldPassword] = useState('');
@@ -364,14 +371,19 @@ export const SellerDashboard: React.FC = () => {
     setDbSetupGmail(currentUser?.email || '');
     setDbSetupDbName(`amarbazar_db_${currentUser?.id || 'shop'}`);
     setDbSetupPassword('');
+    setDbSetupApiKey('');
+    setDbSetupProjectUrl('');
+    setDbSetupBucketName('');
+    setDbSetupRawConfig('');
     setDbSetupMode('auto');
+    setDbSetupConfigMode('fields');
     setDbSetupStep('configure');
   };
 
   const handleCompleteDatabaseConnection = async (type: string) => {
     if (!storeInfo) return;
     setDbSetupStep('connecting');
-    setConnectingProgress(5);
+    setConnectingProgress(10);
 
     // Simulate real-time connection, migration, schema deployment and validation progress
     const interval = setInterval(() => {
@@ -380,20 +392,38 @@ export const SellerDashboard: React.FC = () => {
           clearInterval(interval);
           return 100;
         }
-        return prev + Math.floor(Math.random() * 15) + 10;
+        return prev + Math.floor(Math.random() * 18) + 12;
       });
-    }, 450);
+    }, 380);
 
     // After animation, complete the backend registration
     setTimeout(async () => {
       try {
-        const customCreds = JSON.stringify({
-          configured_with: dbSetupGmail,
-          database_name: dbSetupDbName,
+        let credsObj: Record<string, any> = {
+          configured_with: dbSetupGmail || currentUser?.email || 'vendor@store.com',
+          database_name: dbSetupDbName || `db_${storeInfo.id}`,
           connection_mode: dbSetupMode,
           setup_date: new Date().toISOString(),
           status: 'verified_and_live'
-        }, null, 2);
+        };
+
+        if (dbSetupMode === 'custom') {
+          if (dbSetupConfigMode === 'raw' && dbSetupRawConfig && dbSetupRawConfig.trim()) {
+            try {
+              const parsed = JSON.parse(dbSetupRawConfig);
+              credsObj = { ...credsObj, ...parsed };
+            } catch (e) {
+              credsObj.raw_connection_uri = dbSetupRawConfig.trim();
+            }
+          } else {
+            if (dbSetupApiKey) credsObj.api_key = dbSetupApiKey;
+            if (dbSetupProjectUrl) credsObj.project_url = dbSetupProjectUrl;
+            if (dbSetupBucketName) credsObj.bucket_name = dbSetupBucketName;
+            if (dbSetupPassword) credsObj.secret_token = dbSetupPassword;
+          }
+        }
+
+        const customCreds = JSON.stringify(credsObj, null, 2);
 
         const updatedStore = await api.purchaseSubscription(storeInfo.id, {
           plan: type as any,
@@ -402,21 +432,39 @@ export const SellerDashboard: React.FC = () => {
           txnId: `GCP-${Date.now()}`
         });
 
+        // Map chosen database/cloud subscription to proper storageType
+        let chosenStorageType = 'central';
+        if (type.includes('gcs')) chosenStorageType = 'google_cloud';
+        else if (type.includes('firebase')) chosenStorageType = 'firebase';
+        else if (type.includes('supabase')) chosenStorageType = 'supabase';
+        else if (type.includes('mongodb')) chosenStorageType = 'mongodb';
+        else if (type.includes('postgres') || type.includes('neon')) chosenStorageType = 'neon';
+        else if (type.includes('mysql')) chosenStorageType = 'mysql';
+        else if (type.includes('dynamodb')) chosenStorageType = 'dynamodb';
+        else if (type.includes('azuresql')) chosenStorageType = 'azuresql';
+        else if (type.includes('planetscale')) chosenStorageType = 'planetscale';
+        else if (type.includes('render')) chosenStorageType = 'render';
+        else if (type.includes('railway')) chosenStorageType = 'railway';
+        else if (type.includes('cockroach')) chosenStorageType = 'cockroach';
+        else if (type.includes('aiven')) chosenStorageType = 'aiven';
+
         // Also update store settings storage to point to this new config
         const finalStore = await api.updateSeller(storeInfo.id, {
           ...updatedStore,
-          storageType: type.includes('gcs') ? 'google_cloud' : (type.includes('firebase') ? 'firebase' : 'central'),
+          storageType: chosenStorageType,
           storageCredentials: customCreds
         });
 
         setStoreInfo(finalStore);
+        setSettingsStorageType(chosenStorageType);
+        setSettingsStorageCredentials(customCreds);
         setDbSetupStep('success');
       } catch (e) {
         clearInterval(interval);
         setDbSetupStep('configure');
         alert(language === 'bn' ? 'ডাটাবেজ কানেক্ট করতে ব্যর্থ হয়েছে!' : 'Failed to establish database connection!');
       }
-    }, 3200);
+    }, 2800);
   };
 
   // Sync Store Settings State when storeInfo loads
@@ -460,6 +508,19 @@ export const SellerDashboard: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [sellerId]);
+
+  // Real-time synchronization for seller products when global products change across any device
+  useEffect(() => {
+    if (storeInfo && products && products.length > 0) {
+      const currentStoreId = storeInfo.id;
+      const filtered = products.filter(p => 
+        p.sellerId === currentStoreId || 
+        (currentStoreId === 'sel-1' && p.sellerId === 'usr-seller-1') || 
+        (currentStoreId === 'usr-seller-1' && p.sellerId === 'sel-1')
+      );
+      setSellerProducts(filtered);
+    }
+  }, [products, storeInfo]);
 
   const isSubscriptionActive = !!(storeInfo?.subscriptionPlan && storeInfo?.subscriptionPlan !== 'none' && storeInfo?.subscriptionStatus === 'active');
 
@@ -550,7 +611,7 @@ export const SellerDashboard: React.FC = () => {
     if (!newTitle || !newPrice || !storeInfo) return;
 
     try {
-      await api.createProduct({
+      await appCreateProduct({
         title: newTitle,
         titleBn: newTitleBn || newTitle,
         price: Number(newPrice),
@@ -641,7 +702,7 @@ export const SellerDashboard: React.FC = () => {
     if (!editingProduct || !editTitle || !editPrice) return;
 
     try {
-      await api.updateProduct(editingProduct.id, {
+      await appUpdateProduct(editingProduct.id, {
         title: editTitle,
         titleBn: editTitleBn || editTitle,
         price: Number(editPrice),
@@ -738,10 +799,12 @@ export const SellerDashboard: React.FC = () => {
         : 'Access Denied: You do not have permission to delete products!');
       return;
     }
-    if (confirm('Are you sure you want to delete this product listing?')) {
-      await api.deleteProduct(id);
+    const confirmMsg = language === 'bn' ? 'আপনি কি নিশ্চিত যে এই পণ্যটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this product listing?';
+    if (confirm(confirmMsg)) {
+      setSellerProducts(prev => prev.filter(p => p.id !== id));
+      await appDeleteProduct(id);
       fetchData();
-      refreshProducts();
+      await refreshProducts();
     }
   };
 
@@ -996,7 +1059,8 @@ export const SellerDashboard: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                     {group.options.map((opt, optIdx) => {
                       const priceKey = `${group.name}:${opt}`;
-                      const optPrice = prices[priceKey] || '';
+                      const rawPrice = prices[priceKey];
+                      const optPrice: number | string = typeof rawPrice === 'number' ? rawPrice : (typeof rawPrice === 'object' && rawPrice !== null ? (rawPrice.price ?? '') : '');
                       
                       return (
                         <div key={optIdx} className="flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/40 p-2 rounded-lg border border-slate-100 dark:border-slate-800/50">
@@ -1918,7 +1982,8 @@ export const SellerDashboard: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                     {group.options.map((opt, optIdx) => {
                       const priceKey = `${group.name}:${opt}`;
-                      const optPrice = prices[priceKey] || '';
+                      const rawPrice = prices[priceKey];
+                      const optPrice: number | string = typeof rawPrice === 'number' ? rawPrice : (typeof rawPrice === 'object' && rawPrice !== null ? (rawPrice.price ?? '') : '');
                       
                       return (
                         <div key={optIdx} className="flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/40 p-2 rounded-lg border border-slate-100 dark:border-slate-800/50">
@@ -2128,8 +2193,7 @@ export const SellerDashboard: React.FC = () => {
       )}
 
       {/* Navigation Tabs */}
-      {activeTab !== 'subscription' && (
-        <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-700 overflow-x-auto pb-1 text-xs font-bold">
+      <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-700 overflow-x-auto pb-1 text-xs font-bold">
           <button
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2.5 rounded-xl transition flex items-center space-x-1.5 shrink-0 ${
@@ -2272,7 +2336,6 @@ export const SellerDashboard: React.FC = () => {
             </button>
           )}
         </div>
-      )}
 
       {/* OVERVIEW TAB */}
       {activeTab === 'store_directory' && (
@@ -5371,15 +5434,15 @@ export const SellerDashboard: React.FC = () => {
                   <div className="space-y-4 animate-fadeIn">
                     <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-xl text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
                       {language === 'bn' 
-                        ? 'আপনার জিমেইল ও বেসিক ডিটেইলস দিয়ে খুব সহজেই ডাটাবেজ তৈরি করে কানেক্ট করুন। কোনো প্রকার কোড বা জটিল ব্যাকএন্ড কনফিগারেশনের প্রয়োজন নেই।'
-                        : 'Deploy and auto-link your isolated database segment using your Gmail. No code or manual tables creation required.'}
+                        ? 'আপনার জিমেইল এবং নিজস্ব এপিআই কি (API Key) বা ইউআরআই দিয়ে মুহূর্তের মধ্যে ডাটাবেজ কানেক্ট করুন। কোনো জটিল কোডিং ছাড়াই সম্পূর্ণ অটোমেটিক সংযুক্ত হবে।'
+                        : 'Deploy and auto-link your isolated database segment using your API Key or URI. No code or manual server setup required.'}
                     </div>
 
                     <div className="space-y-3.5">
                       {/* Gmail Address Input */}
                       <div>
                         <label className="block text-[11px] font-black text-slate-700 dark:text-slate-300 mb-1">
-                          {language === 'bn' ? 'আপনার নিজস্ব জিমেইল (Gmail):' : 'Your Gmail Address:'}
+                          {language === 'bn' ? 'আপনার নিজস্ব জিমেইল (Gmail Address):' : 'Your Gmail Address:'}
                         </label>
                         <input 
                           type="email"
@@ -5387,22 +5450,22 @@ export const SellerDashboard: React.FC = () => {
                           value={dbSetupGmail}
                           onChange={(e) => setDbSetupGmail(e.target.value)}
                           placeholder="example@gmail.com"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium"
                         />
                       </div>
 
                       {/* Database Name Input */}
                       <div>
                         <label className="block text-[11px] font-black text-slate-700 dark:text-slate-300 mb-1">
-                          {language === 'bn' ? 'ডাটাবেজ নাম / আইডি:' : 'Database Name / ID:'}
+                          {language === 'bn' ? 'ডাটাবেজ নাম / আইডি (Database Name / ID):' : 'Database Name / ID:'}
                         </label>
                         <input 
                           type="text"
                           required
                           value={dbSetupDbName}
                           onChange={(e) => setDbSetupDbName(e.target.value)}
-                          placeholder="my_shop_database"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500"
+                          placeholder="amarbazar_db_custom"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                       </div>
 
@@ -5415,7 +5478,7 @@ export const SellerDashboard: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setDbSetupMode('auto')}
-                            className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center justify-center space-y-1 ${dbSetupMode === 'auto' ? 'border-blue-500 bg-blue-500/5 text-blue-600 dark:text-blue-400 font-extrabold' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-400'}`}
+                            className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center justify-center space-y-1 ${dbSetupMode === 'auto' ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-extrabold shadow-xs' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-400'}`}
                           >
                             <Zap className="w-4 h-4 text-blue-500" />
                             <span className="text-[10px]">{language === 'bn' ? '১-ক্লিক অটো সংযোগ' : '1-Click Auto'}</span>
@@ -5423,27 +5486,113 @@ export const SellerDashboard: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setDbSetupMode('custom')}
-                            className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center justify-center space-y-1 ${dbSetupMode === 'custom' ? 'border-blue-500 bg-blue-500/5 text-blue-600 dark:text-blue-400 font-extrabold' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-400'}`}
+                            className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center justify-center space-y-1 ${dbSetupMode === 'custom' ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-extrabold shadow-xs' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-400'}`}
                           >
-                            <Settings className="w-4 h-4 text-slate-500" />
-                            <span className="text-[10px]">{language === 'bn' ? 'ম্যানুয়াল কানেকশন' : 'Manual Config'}</span>
+                            <Settings className="w-4 h-4 text-amber-500" />
+                            <span className="text-[10px]">{language === 'bn' ? 'এপিআই কি ও ম্যানুয়াল' : 'API Key & Config'}</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* If custom, show password / credentials token */}
+                      {/* If custom, show structured API Key / Token and URL fields */}
                       {dbSetupMode === 'custom' && (
-                        <div className="animate-fadeIn">
-                          <label className="block text-[11px] font-black text-slate-700 dark:text-slate-300 mb-1">
-                            {language === 'bn' ? 'সিক্রেট এপিআই কি / অ্যাক্সেস টোকেন:' : 'Secret API Key / Token:'}
-                          </label>
-                          <input 
-                            type="password"
-                            value={dbSetupPassword}
-                            onChange={(e) => setDbSetupPassword(e.target.value)}
-                            placeholder="Enter custom cloud token/URI"
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                          />
+                        <div className="p-3 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 animate-fadeIn">
+                          
+                          {/* Config Mode Switch */}
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-slate-800">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                              {language === 'bn' ? 'ক্রেডেনশিয়াল ইনপুট পদ্ধতি' : 'Input Method'}
+                            </span>
+                            <div className="flex space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => setDbSetupConfigMode('fields')}
+                                className={`px-2 py-1 rounded-lg text-[9px] font-bold transition cursor-pointer ${
+                                  dbSetupConfigMode === 'fields' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                {language === 'bn' ? 'নির্দিষ্ট ফিল্ড' : 'Field by Field'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDbSetupConfigMode('raw')}
+                                className={`px-2 py-1 rounded-lg text-[9px] font-bold transition cursor-pointer ${
+                                  dbSetupConfigMode === 'raw' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                {language === 'bn' ? '১-লাইনে URI/JSON পেস্ট' : 'Paste URI/JSON'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {dbSetupConfigMode === 'fields' ? (
+                            <div className="space-y-2.5">
+                              {/* 1. API Key / Secret Token */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                  {language === 'bn' ? '১. সিক্রেট এপিআই কি / টোকেন (Secret API Key / Token):' : '1. Secret API Key / Token:'}
+                                </label>
+                                <input 
+                                  type="text"
+                                  value={dbSetupApiKey}
+                                  onChange={(e) => setDbSetupApiKey(e.target.value)}
+                                  placeholder={googleSetupModal.type === 'supabase' ? 'sbp_... অথবা anon_key' : googleSetupModal.type === 'firebase' ? 'AIzaSy... (API Key)' : 'API Key / Auth Token'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                              </div>
+
+                              {/* 2. Project URL / Connection URI */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                  {language === 'bn' ? '২. প্রজেক্ট ইউআরএল / হোস্ট (Project URL / Connection Host):' : '2. Project URL / Host:'}
+                                </label>
+                                <input 
+                                  type="text"
+                                  value={dbSetupProjectUrl}
+                                  onChange={(e) => setDbSetupProjectUrl(e.target.value)}
+                                  placeholder={googleSetupModal.type === 'supabase' ? 'https://xyzcompany.supabase.co' : googleSetupModal.type === 'mongodb' ? 'mongodb+srv://user:pass@cluster0.mongodb.net' : 'https://your-database-endpoint.com'}
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                              </div>
+
+                              {/* 3. Bucket Name / Region */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                  {language === 'bn' ? '৩. বাকেট নাম / রিজিয়ন (ঐচ্ছিক):' : '3. Bucket Name / Region (Optional):'}
+                                </label>
+                                <input 
+                                  type="text"
+                                  value={dbSetupBucketName}
+                                  onChange={(e) => setDbSetupBucketName(e.target.value)}
+                                  placeholder="my-store-bucket / ap-southeast-1"
+                                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                {language === 'bn' ? 'সম্পূর্ণ Connection String (URI) বা Config JSON পেস্ট করুন:' : 'Paste Connection URI or Config JSON:'}
+                              </label>
+                              <textarea
+                                rows={3}
+                                value={dbSetupRawConfig}
+                                onChange={(e) => setDbSetupRawConfig(e.target.value)}
+                                placeholder="postgresql://postgres:password@db.supabase.co:5432/postgres&#10;অথবা { &quot;apiKey&quot;: &quot;...&quot;, &quot;projectId&quot;: &quot;...&quot; }"
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                              />
+                            </div>
+                          )}
+
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                            {language === 'bn'
+                              ? '💡 তথ্যগুলো দিয়ে নিচের "Connect & Deploy" বাটনে চাপ দিলেই ডাটাবেজ স্বয়ংক্রিয়ভাবে অ্যাক্টিভ হবে।'
+                              : '💡 Fill the information and press "Connect & Deploy" to auto-sync.'}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -5461,10 +5610,10 @@ export const SellerDashboard: React.FC = () => {
                         type="button"
                         onClick={() => handleCompleteDatabaseConnection(config.planType)}
                         disabled={!dbSetupGmail}
-                        className="w-2/3 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-extrabold text-xs transition cursor-pointer flex items-center justify-center space-x-1"
+                        className="w-2/3 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-extrabold text-xs transition cursor-pointer flex items-center justify-center space-x-1 shadow-md"
                       >
                         <Database className="w-3.5 h-3.5" />
-                        <span>{language === 'bn' ? 'ডাটাবেজ কানেক্ট করুন' : 'Connect & Deploy'}</span>
+                        <span>{language === 'bn' ? 'Connect & Deploy' : 'Connect & Deploy'}</span>
                       </button>
                     </div>
                   </div>

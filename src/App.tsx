@@ -24,6 +24,7 @@ import { PaymentModal } from './components/common/PaymentModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { AiAssistantModal } from './components/common/AiAssistantModal';
 import { OrderTrackingModal } from './components/customer/OrderTrackingModal';
+import { FacebookMessengerWidget } from './components/common/FacebookMessengerWidget';
 import { CustomerTrackingSupport } from './components/customer/CustomerTrackingSupport';
 import { BottomNavigation } from './components/common/BottomNavigation';
 import { OutletsView } from './components/customer/OutletsView';
@@ -200,7 +201,7 @@ function MainLayout() {
     return ['customer', 'store_directory', 'customer_profile', 'register_vendor', 'outlets', 'customer_messages'].includes(activePanel);
   };
 
-  const requiresLogin = ['customer_profile', 'register_vendor', 'seller', 'inventory_workspace', 'product_reviews', 'customer_messages', 'dashboard_home', 'admin', 'settings', 'seller_applications', 'subscription_pricing'].includes(activePanel);
+  const requiresLogin = ['customer_profile', 'register_vendor', 'seller', 'inventory_workspace', 'product_reviews', 'dashboard_home', 'admin', 'settings', 'seller_applications', 'subscription_pricing'].includes(activePanel);
 
   return (
     <div className="h-screen bg-[#f4f6fa] dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-row font-sans transition-colors duration-200 overflow-hidden">

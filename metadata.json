@@ -1,6 +1,11 @@
 {
-  "name": "AmarBazar BD - Digital Marketplace",
+  "name": "Remix AmarBazar BD - Digital Marketplace",
   "description": "Comprehensive Bangladeshi Digital Marketplace featuring Customer, Seller, and Admin panels, bKash/Nagad/Rocket payment simulation, courier tracking, Bangla/English bilingual support, and real-time inventory management.",
-  "requestFramePermissions": ["camera", "microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

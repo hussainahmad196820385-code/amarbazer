@@ -24,11 +24,17 @@ export type SellerStaffPermission =
   | 'messages_chat'
   | 'products_view'
   | 'products_manage'
+  | 'products_add'
   | 'inventory_manage'
   | 'reviews_manage'
   | 'withdrawals_view'
   | 'withdrawals_manage'
-  | 'store_settings';
+  | 'finance_view'
+  | 'finance_withdraw'
+  | 'store_view'
+  | 'store_settings'
+  | 'settings_manage'
+  | (string & {});
 
 export interface SellerStaffMember {
   id: string;
@@ -47,13 +53,16 @@ export interface SellerStaffMember {
 
 export type AdminStaffPermission = 
   | 'admin_users_manage' 
+  | 'admin_users_moderate'
   | 'admin_sellers_approve' 
   | 'admin_sellers_permissions' 
   | 'admin_orders_manage' 
   | 'admin_finance_withdrawals' 
   | 'admin_categories_manage' 
   | 'admin_coupons_manage' 
-  | 'admin_system_settings';
+  | 'admin_system_settings'
+  | 'admin_settings_configure'
+  | (string & {});
 
 export interface AdminStaffMember {
   id: string;
@@ -88,6 +97,7 @@ export interface User {
   email: string;
   phone: string;
   role: Role;
+  roleTitle?: string;
   isVerified: boolean;
   avatar?: string;
   addresses: Address[];
@@ -117,7 +127,7 @@ export interface Address {
 }
 
 export interface ProductVariant {
-  id: string;
+  id?: string;
   name: string; // Color, Size, Storage
   options: string[]; // ['Red', 'Blue'] or ['M', 'L', 'XL'] or ['128GB', '256GB']
   priceOffset?: number; // extra cost
@@ -153,6 +163,7 @@ export interface Product {
   videoUrl?: string;
   rating: number;
   reviewCount: number;
+  reviewsCount?: number;
   tags: string[];
   isFeatured?: boolean;
   isFlashDeal?: boolean;
@@ -275,6 +286,7 @@ export interface SellerStore {
   id: string;
   sellerId: string;
   storeName: string;
+  name?: string;
   storeNameBn?: string;
   storeAddress?: string;
   storeCategory?: string;

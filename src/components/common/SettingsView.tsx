@@ -5,7 +5,7 @@ import {
   Sliders, Save, RefreshCw, Check, ShieldAlert, 
   Globe, Sun, Moon, CreditCard, Lock, Smartphone, 
   Store, User, Bell, HelpCircle, Eye, ChevronRight, Volume2, Trash2, ShieldCheck,
-  Palette, Sparkles, Download, Terminal, Layers, Radio
+  Palette, Sparkles, Download, Terminal, Layers, Radio, MessageCircle, ExternalLink
 } from 'lucide-react';
 import { AdminDashboard } from '../admin/AdminDashboard';
 import { nativeBridge } from '../../services/nativeBridge';
@@ -42,7 +42,30 @@ export const SettingsView: React.FC = () => {
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'system' | 'appearance' | 'account' | 'payment' | 'sounds' | 'translation_rules' | 'admin_panel' | 'color_palette' | 'android_app'>('system');
+  const [activeSubTab, setActiveSubTab] = useState<'system' | 'appearance' | 'account' | 'payment' | 'sounds' | 'translation_rules' | 'admin_panel' | 'color_palette' | 'android_app' | 'messenger_automation'>('system');
+
+  // Facebook Messenger & WhatsApp Automation Settings State
+  const [fbPageUsername, setFbPageUsername] = useState(() => {
+    return localStorage.getItem('amarbazar_fb_page_username') || 'AmarBazarBD.Official';
+  });
+  const [whatsappNumber, setWhatsappNumber] = useState(() => {
+    return localStorage.getItem('amarbazar_whatsapp_number') || '8801712345678';
+  });
+  const [fbAutoReplyGreeting, setFbAutoReplyGreeting] = useState(() => {
+    return localStorage.getItem('amarbazar_fb_greeting') || 'আসসালামু আলাইকুম! আমারবাজার বিডি-তে আপনাকে স্বাগতম। আমরা সাধারণত সাথে সাথে উত্তর দিয়ে থাকি।';
+  });
+  const [fbTrackOrderEnabled, setFbTrackOrderEnabled] = useState(true);
+  const [fbDailyDealsEnabled, setFbDailyDealsEnabled] = useState(true);
+  const [fbDeliveryFaqEnabled, setFbDeliveryFaqEnabled] = useState(true);
+  const [fbMessengerSaved, setFbMessengerSaved] = useState(false);
+
+  const handleSaveMessengerSettings = () => {
+    localStorage.setItem('amarbazar_fb_page_username', fbPageUsername.trim());
+    localStorage.setItem('amarbazar_whatsapp_number', whatsappNumber.trim());
+    localStorage.setItem('amarbazar_fb_greeting', fbAutoReplyGreeting.trim());
+    setFbMessengerSaved(true);
+    setTimeout(() => setFbMessengerSaved(false), 2500);
+  };
 
   // Custom English to Bangla replacements
   const [replacements, setReplacements] = useState<Array<{ id: string; originalText: string; replacementText: string; userRole: string }>>(() => {
@@ -319,6 +342,26 @@ export const SettingsView: React.FC = () => {
             </span>
             <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-md">
               AAB Ready
+            </span>
+          </button>
+
+          <button 
+            onClick={() => setActiveSubTab('messenger_automation')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-between transition ${
+              activeSubTab === 'messenger_automation' 
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="flex items-center -space-x-1">
+                <span className="w-3.5 h-3.5 rounded-full bg-[#25D366] flex items-center justify-center text-white text-[8px] font-black">W</span>
+                <span className="w-3.5 h-3.5 rounded-full bg-[#0084FF] flex items-center justify-center text-white text-[8px] font-black">M</span>
+              </span>
+              {language === 'bn' ? 'হোয়াটসঅ্যাপ ও মেসেঞ্জার অটোমেশন' : 'WhatsApp & FB Automation'}
+            </span>
+            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-md">
+              100% Free
             </span>
           </button>
         </div>
@@ -1525,6 +1568,250 @@ export const SettingsView: React.FC = () => {
                   <div className="p-2.5 rounded-lg bg-black/50 border border-slate-800">
                     <div className="text-slate-400 text-[10px] mb-0.5"># ৪. টেস্টিংয়ের জন্য সরাসরি Debug APK জেনারেট করা:</div>
                     <div className="text-blue-300 font-bold">cd android && ./gradlew assembleDebug</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSubTab === 'messenger_automation' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <span className="flex items-center -space-x-1">
+                      <span className="w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center text-white text-[10px] font-black shadow-xs">W</span>
+                      <span className="w-5 h-5 rounded-full bg-[#0084FF] flex items-center justify-center text-white text-[10px] font-black shadow-xs">M</span>
+                    </span>
+                    {language === 'bn' ? 'ফ্রি WhatsApp ও Facebook মেসেঞ্জার অটোমেশন কনফিগারেশন' : '100% Free WhatsApp & Messenger Automation'}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {language === 'bn' 
+                      ? 'কোনো পেইড API বা সাবস্ক্রিপশন ফি ছাড়াই সরাসরি WhatsApp (wa.me) এবং Facebook Messenger (m.me)-এর স্মার্ট অটো-রিপ্লাই ও কাস্টমার কেয়ার চালান।' 
+                      : 'Run automated customer support with 0 fees using native WhatsApp (wa.me) & Messenger (m.me) protocols.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveMessengerSettings}
+                    className="px-4 py-2 bg-gradient-to-r from-[#25D366] via-[#0084FF] to-[#A822D6] hover:opacity-90 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {fbMessengerSaved ? (language === 'bn' ? 'সংরক্ষিত হয়েছে!' : 'Saved!') : (language === 'bn' ? 'সেটিংস সেভ করুন' : 'Save Config')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Dual Channel Quick Test Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* WhatsApp Direct Link Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 flex flex-col justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#25D366] text-white flex items-center justify-center shadow-md shrink-0">
+                      <svg className="w-6 h-6 fill-white" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <span>WhatsApp Business Link</span>
+                        <span className="px-2 py-0.5 bg-[#25D366]/20 text-[#25D366] font-black text-[9px] rounded-full">
+                          FREE wa.me
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        https://wa.me/{whatsappNumber.replace(/[^0-9]/g, '')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-emerald-500/10">
+                    <a
+                      href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-[#25D366] text-white hover:bg-emerald-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                    >
+                      <span>Open wa.me</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`);
+                        alert(language === 'bn' ? 'হোয়াটসঅ্যাপ লিংক কপি হয়েছে!' : 'WhatsApp link copied!');
+                      }}
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      {language === 'bn' ? '📋 কপি লিংক' : '📋 Copy'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Messenger Direct Link Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-sky-500/10 to-blue-500/10 border border-sky-500/20 flex flex-col justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#0084FF] text-white flex items-center justify-center shadow-md shrink-0">
+                      <svg className="w-6 h-6 fill-white" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.14 2 11.25C2 14.16 3.44 16.74 5.69 18.38V22L9.18 20.08C10.08 20.33 11.02 20.47 12 20.47C17.52 20.47 22 16.33 22 11.22C22 6.14 17.52 2 12 2ZM13.06 14.47L10.77 12.03L6.3 14.47L11.22 9.24L13.56 11.68L17.98 9.24L13.06 14.47Z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <span>Facebook Messenger Link</span>
+                        <span className="px-2 py-0.5 bg-[#0084FF]/20 text-[#0084FF] font-black text-[9px] rounded-full">
+                          FREE m.me
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono font-bold text-[#0084FF] mt-0.5">
+                        https://m.me/{fbPageUsername}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-sky-500/10">
+                    <a
+                      href={`https://m.me/${encodeURIComponent(fbPageUsername)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-[#0084FF] text-white hover:bg-blue-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                    >
+                      <span>Open m.me</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://m.me/${fbPageUsername}`);
+                        alert(language === 'bn' ? 'মেসেঞ্জার লিংক কপি হয়েছে!' : 'Messenger link copied!');
+                      }}
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      {language === 'bn' ? '📋 কপি লিংক' : '📋 Copy'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {language === 'bn' ? 'হোয়াটসঅ্যাপ সাপোর্ট মোবাইল নম্বর' : 'WhatsApp Business Mobile Number'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">wa.me/+</span>
+                    <input
+                      type="text"
+                      value={whatsappNumber}
+                      onChange={(e) => setWhatsappNumber(e.target.value.replace(/[^0-9+]/g, ''))}
+                      placeholder="8801712345678"
+                      className="w-full text-xs pl-20 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#25D366] font-medium"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {language === 'bn' ? 'কান্ট্রি কোডসহ নম্বর দিন (যেমন: 8801712345678)' : 'Enter phone with country code (e.g. 8801712345678)'}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {language === 'bn' ? 'ফেসবুক পেজ ইউজারনেম / আইডি' : 'Facebook Page Username or ID'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">m.me/</span>
+                    <input
+                      type="text"
+                      value={fbPageUsername}
+                      onChange={(e) => setFbPageUsername(e.target.value.replace(/^https?:\/\/(www\.)?(m\.me|facebook\.com)\//, ''))}
+                      placeholder="AmarBazarBD.Official"
+                      className="w-full text-xs pl-16 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0084FF] font-medium"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {language === 'bn' ? 'আপনার ফেসবুক পেজের ইউজারনেম দিন (যেমন: AmarBazarBD)' : 'Enter your official Facebook page username (e.g. AmarBazarBD)'}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {language === 'bn' ? 'স্বয়ংক্রিয় শুভেচ্ছা বার্তা (Auto-Greeting)' : 'Automated Bot Welcome Greeting'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={fbAutoReplyGreeting}
+                    onChange={(e) => setFbAutoReplyGreeting(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Built-in Automation Flow Checklist */}
+              <div className="p-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    {language === 'bn' ? 'হোয়াটসঅ্যাপ ও মেসেঞ্জার সক্রিয় বট অটোমেশনসমূহ' : 'Active WhatsApp & Messenger Automations (100% Free)'}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                    Instant 0ms Response
+                  </span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-[#25D366]/20 text-[#25D366] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'হোয়াটসঅ্যাপ ১-ক্লিক অর্ডার' : 'WhatsApp 1-Click Order'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {language === 'bn' ? 'পণ্য বা কার্ট সরাসরি কাস্টমার কেয়ারের হোয়াটসঅ্যাপে পাঠিয়ে দ্রুত অর্ডার সম্পন্ন।' : 'Instantly formats order details and sends pre-filled message to WhatsApp.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'অর্ডার ট্র্যাকিং অটোমেশন' : 'Order Tracking Flow'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {language === 'bn' ? 'অর্ডার আইডি লিখলেই সরাসরি লাইভ স্ট্যাটাস ও ডেলিভারি তথ্য প্রদান করে।' : 'Automatically finds live orders and displays delivery progress.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'হট ডিলস ও কম্বো প্যাকেজ' : 'Hot Deals & Combos Showcase'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {language === 'bn' ? 'সেরা ডিসকাউন্ট ও কম্বো অফারের তালিকা অটোমেটিকভাবে শেয়ার করে।' : 'Instantly pulls discount prices and active flash deals.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'bn' ? 'ডেলিভারি চার্জ ও কুরিয়ার FAQ' : 'Delivery & Courier Rules'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {language === 'bn' ? 'ঢাকা (৬০৳) ও ঢাকার বাইরে (১২০৳) ক্যাশ অন ডেলিভারির নিয়ম বলে দেয়।' : 'Explains Dhaka 60৳ & Outside 120৳ COD guidelines.'}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

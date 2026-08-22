@@ -12,7 +12,7 @@ import { Order, Address, getProductUnitPrice } from '../../types';
 import { api } from '../../services/api';
 
 export type SlipType = 'all' | 'confirmed' | 'cancelled' | 'money_receipt' | 'delivery_chalan' | 'return_slip' | 'printer_station';
-export type PrintFormat = 'a4' | 'pos_80mm' | 'pos_58mm' | 'shipping_label';
+export type PrintFormat = 'a4' | 'a5' | 'pos_80mm' | 'pos_58mm' | 'shipping_label';
 
 interface OrderSlipsHubProps {
   initialSlipType?: SlipType;
@@ -27,8 +27,10 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [formatPickerOrder, setFormatPickerOrder] = useState<Order | null>(null);
   const [printFormat, setPrintFormat] = useState<PrintFormat>('a4');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [locationQrCodeDataUrl, setLocationQrCodeDataUrl] = useState<string>('');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [thermalWidth, setThermalWidth] = useState<'80mm' | '58mm'>('80mm');
   const [btStatus, setBtStatus] = useState<'idle' | 'scanning' | 'connected' | 'unsupported'>('idle');
@@ -230,9 +232,10 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
     fetchOrders();
   }, [currentUser]);
 
-  // Generate QR Code whenever selected order changes
+  // Generate QR Codes (1: Invoice Data & Verification, 2: Customer Delivery Map Location)
   useEffect(() => {
     if (selectedOrder) {
+      // QR 1: Order Details & Digital Invoice Verification
       const qrPayload = JSON.stringify({
         org: 'AmarBazar BD Ltd.',
         orderNo: selectedOrder.orderNumber || selectedOrder.order5DigitId || selectedOrder.id,
@@ -256,6 +259,24 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
       })
       .then(url => setQrCodeDataUrl(url))
       .catch(err => console.error('QR code err:', err));
+
+      // QR 2: Customer Exact Delivery Location (Google Maps Direct Navigation)
+      const fullAddressQuery = encodeURIComponent(
+        `${selectedOrder.shippingAddress?.fullAddress || ''}, ${selectedOrder.shippingAddress?.thana || ''}, ${selectedOrder.shippingAddress?.district || ''}, Bangladesh`.trim()
+      );
+      const locationMapUrl = `https://www.google.com/maps/search/?api=1&query=${fullAddressQuery}`;
+
+      QRCode.toDataURL(locationMapUrl, {
+        width: 260,
+        margin: 1,
+        color: {
+          dark: '#1e3a8a', // Deep royal navy/blue for map location
+          light: '#ffffff'
+        },
+        errorCorrectionLevel: 'M'
+      })
+      .then(url => setLocationQrCodeDataUrl(url))
+      .catch(err => console.error('Location QR code err:', err));
     }
   }, [selectedOrder]);
 
@@ -540,57 +561,146 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
               </div>
 
               {/* Supported Printer Categories Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 space-y-2">
-                  <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
-                    <Laptop className="w-4 h-4 text-sky-500" />
-                    <span>১. লেজার ও ইঙ্কজেট স্ট্যান্ডার্ড প্রিন্টার (A4 / Letter)</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                {/* 1. A4 Laser/Inkjet */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
+                        <Laptop className="w-4 h-4 text-sky-500" />
+                        <span>১. ফুল পেজ A4 ইনভয়েস</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 rounded text-[9px] font-black">210×297mm</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      Canon, HP, Epson, Brother বা যেকোনো ব্র্যান্ডের ডেস্কটপ প্রিন্টার। অফিশিয়াল ভ্যাট ও ট্যাক্স চালানের জন্য আদর্শ।
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                    Canon, HP, Epson, Brother বা যেকোনো ব্র্যান্ডের ডেস্কটপ প্রিন্টার যা কম্পিউটার, ল্যাপটপ বা ফোনের সাথে WiFi/USB দ্বারা সংযুক্ত।
-                  </p>
-                  <span className="inline-block px-2 py-0.5 bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 rounded-md text-[10px] font-black">
-                    সাপোর্ট: Full Page A4 Official Tax Invoice
-                  </span>
+                  <button
+                    onClick={() => {
+                      if (orders.length > 0) handleDirectPrint(orders[0], 'a4');
+                    }}
+                    className="w-full py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center space-x-1.5 transition shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>A4 টেস্ট প্রিন্ট দিন</span>
+                  </button>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 space-y-2">
-                  <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
-                    <Bluetooth className="w-4 h-4 text-blue-500" />
-                    <span>২. ব্লুটুথ ও থার্মাল পিওএস প্রিন্টার (80mm & 58mm)</span>
+                {/* 2. A5 Half Page */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
+                        <FileText className="w-4 h-4 text-indigo-500" />
+                        <span>২. হাফ পেজ A5 মেমো</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 rounded text-[9px] font-black">148×210mm</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      কাগজ সাশ্রয়ী মাঝারি সাইজ চালান বা ডেলিভারি মেমো। সাধারণ প্রিন্টারে এক A4 পাতায় ২টি স্লিপ।
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                    Xprinter, Rongta, GOOJPRT, Netum, Sunmi ইত্যাদি যেকোনো পোর্টেবল থার্মাল রসিদ প্রিন্টার যা ব্লুটুথ বা ক্যাবলের মাধ্যমে ফোন/ট্যাবের সাথে চলে।
-                  </p>
-                  <span className="inline-block px-2 py-0.5 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-black">
-                    সাপোর্ট: 80mm & 58mm Roll Receipt
-                  </span>
+                  <button
+                    onClick={() => {
+                      if (orders.length > 0) handleDirectPrint(orders[0], 'a5');
+                    }}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center space-x-1.5 transition shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>A5 টেস্ট প্রিন্ট দিন</span>
+                  </button>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 space-y-2">
-                  <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
-                    <Smartphone className="w-4 h-4 text-emerald-500" />
-                    <span>৩. মোবাইল ওয়্যারলেস প্রিন্টিং (Android & iPhone)</span>
+                {/* 3. 80mm POS Thermal */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
+                        <Bluetooth className="w-4 h-4 text-blue-500" />
+                        <span>৩. ৮০ মিমি POS থার্মাল (3")</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 rounded text-[9px] font-black">80mm Roll</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      Xprinter, Rongta, Sunmi ৩ ইঞ্চি কাউন্টার ও ব্লুটুথ ক্যাশ রসিদ প্রিন্টার। অটো-কাটার সমর্থিত।
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                    Android Default Print Service, AirPrint, Mopria বা RawBT অ্যাপের মাধ্যমে যেকোনো ফোন থেকে ১ ক্লিকে প্রিন্ট ও অটো-কাট।
-                  </p>
-                  <span className="inline-block px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-md text-[10px] font-black">
-                    সাপোর্ট: Mobile Share & Direct PDF
-                  </span>
+                  <button
+                    onClick={() => {
+                      if (orders.length > 0) handleDirectPrint(orders[0], 'pos_80mm');
+                    }}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center space-x-1.5 transition shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>80mm টেস্ট প্রিন্ট দিন</span>
+                  </button>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 space-y-2">
-                  <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
-                    <Truck className="w-4 h-4 text-amber-500" />
-                    <span>৪. কুরিয়ার শিপিং বারকোড ও স্টিকার প্রিন্টার (4x6)</span>
+                {/* 4. 58mm Slim Pocket POS */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
+                        <Smartphone className="w-4 h-4 text-emerald-500" />
+                        <span>৪. ৫৮ মিমি চিকন স্লিপ (2")</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-black">58mm Mini</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      পোর্টেবল ২ ইঞ্চি ছোট পকেট থার্মাল প্রিন্টার (GOOJPRT, Netum, Mini BT)। রাইডার ও ডেলিভারির জন্য সেরা।
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                    Zebra, TSC, HPRT ইত্যাদি থার্মাল লেবেল স্টিকার প্রিন্টার যা পার্সেল বক্সে লাগানোর জন্য বারকোড গেটপাস স্টিকার প্রিন্ট করে।
-                  </p>
-                  <span className="inline-block px-2 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-md text-[10px] font-black">
-                    সাপোর্ট: 4"x6" Courier Dispatch Label
-                  </span>
+                  <button
+                    onClick={() => {
+                      if (orders.length > 0) handleDirectPrint(orders[0], 'pos_58mm');
+                    }}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center space-x-1.5 transition shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>58mm টেস্ট প্রিন্ট দিন</span>
+                  </button>
+                </div>
+
+                {/* 5. 4x6 Courier Label */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-750 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
+                        <Truck className="w-4 h-4 text-amber-500" />
+                        <span>৫. ৪×৬ কুরিয়ার স্টিকার</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded text-[9px] font-black">100×150mm</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      Zebra, TSC, HPRT ইত্যাদি থার্মাল লেবেল স্টিকার প্রিন্টার। পার্সেল বক্সে লাগানোর জন্য বারকোড স্টিকার।
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (orders.length > 0) handleDirectPrint(orders[0], 'shipping_label');
+                    }}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-black flex items-center justify-center space-x-1.5 transition shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>4x6 লেবেল টেস্ট দিন</span>
+                  </button>
+                </div>
+
+                {/* 6. Universal Print Service Guide */}
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-extrabold text-xs">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span>ইউনিভার্সাল ড্রাইভারহীন সংযোগ</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                      Windows, Mac, Android বা iOS যেকোনো ডিভাইসে অতিরিক্ত কোনো সফটওয়্যার ছাড়াই সরাসরি ব্রাউজার থেকে ১০০% নিখুঁত প্রিন্ট হয়।
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                    ✓ অটো পেপার সাইজ এডজাস্টমেন্ট সক্রিয়
+                  </div>
                 </div>
               </div>
 
@@ -632,13 +742,13 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                   <button
                     onClick={() => {
                       if (orders.length > 0) {
-                        handleDirectPrint(orders[0], 'pos_80mm');
+                        setFormatPickerOrder(orders[0]);
                       }
                     }}
                     className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs transition flex items-center justify-center space-x-2"
                   >
                     <Printer className="w-4 h-4" />
-                    <span>টেস্ট প্রিন্ট দিন</span>
+                    <span>সাইজ মেনু খুলুন</span>
                   </button>
                 </div>
               </div>
@@ -802,14 +912,14 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                         <span>প্রিভিউ</span>
                       </button>
 
-                      {/* Direct Print */}
+                      {/* Print Size Selection Trigger */}
                       <button
-                        onClick={() => handleDirectPrint(order, 'a4')}
+                        onClick={() => setFormatPickerOrder(order)}
                         className="px-3 py-2 bg-slate-900 hover:bg-slate-850 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-extrabold text-[11px] rounded-xl flex-1 flex items-center justify-center space-x-1.5 transition shadow-xs"
-                        title="সরাসরি প্রিন্টারে প্রিন্ট দিন"
+                        title="প্রিন্টার ও কাগজের সাইজ নির্বাচন করুন"
                       >
                         <Printer className="w-3.5 h-3.5 text-amber-400" />
-                        <span>প্রিন্ট</span>
+                        <span>প্রিন্ট সাইজ</span>
                       </button>
 
                       {/* Download PDF */}
@@ -826,7 +936,7 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                       <button
                         onClick={() => handleDirectPrint(order, 'pos_80mm')}
                         className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl transition"
-                        title="৮০মিমি পিওএস থার্মাল স্লিপ প্রিন্ট"
+                        title="৮০মিমি পিওএস থার্মাল স্লিপ দ্রুত প্রিন্ট"
                       >
                         <Smartphone className="w-3.5 h-3.5" />
                       </button>
@@ -839,13 +949,161 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
         </div>
       )}
 
+      {/* QUICK PRINT FORMAT PICKER MODAL */}
+      {formatPickerOrder && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-150 dark:border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    {language === 'bn' ? 'প্রিন্ট সাইজ ও ফরম্যাট নির্বাচন করুন' : 'Select Print Format & Paper Size'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    অর্ডার: #{formatPickerOrder.orderNumber || formatPickerOrder.order5DigitId || formatPickerOrder.id}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setFormatPickerOrder(null)}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 rounded-xl transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* Option 1: A4 */}
+              <button
+                onClick={() => {
+                  const target = formatPickerOrder;
+                  setFormatPickerOrder(null);
+                  handleDirectPrint(target, 'a4');
+                }}
+                className="p-3 bg-slate-50 hover:bg-sky-50 dark:bg-slate-800/40 dark:hover:bg-sky-950/40 border border-slate-200 hover:border-sky-300 dark:border-slate-750 dark:hover:border-sky-700 rounded-2xl text-left transition group space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-black text-xs text-slate-900 dark:text-white group-hover:text-sky-600">
+                    <Laptop className="w-3.5 h-3.5 text-sky-500" />
+                    <span>১. ফুল পেজ A4</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400">210×297mm</span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">বড় অফিসিয়াল ইনভয়েস ও ট্যাক্স চালান</p>
+              </button>
+
+              {/* Option 2: A5 */}
+              <button
+                onClick={() => {
+                  const target = formatPickerOrder;
+                  setFormatPickerOrder(null);
+                  handleDirectPrint(target, 'a5');
+                }}
+                className="p-3 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-800/40 dark:hover:bg-indigo-950/40 border border-slate-200 hover:border-indigo-300 dark:border-slate-750 dark:hover:border-indigo-700 rounded-2xl text-left transition group space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-black text-xs text-slate-900 dark:text-white group-hover:text-indigo-600">
+                    <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>২. হাফ পেজ A5</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400">148×210mm</span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">কাগজ সাশ্রয়ী মাঝারি ডেলিভারি মেমো</p>
+              </button>
+
+              {/* Option 3: 80mm POS */}
+              <button
+                onClick={() => {
+                  const target = formatPickerOrder;
+                  setFormatPickerOrder(null);
+                  handleDirectPrint(target, 'pos_80mm');
+                }}
+                className="p-3 bg-slate-50 hover:bg-blue-50 dark:bg-slate-800/40 dark:hover:bg-blue-950/40 border border-slate-200 hover:border-blue-300 dark:border-slate-750 dark:hover:border-blue-700 rounded-2xl text-left transition group space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-black text-xs text-slate-900 dark:text-white group-hover:text-blue-600">
+                    <Bluetooth className="w-3.5 h-3.5 text-blue-500" />
+                    <span>৩. ৮০ মিমি POS (3")</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400">80mm Roll</span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">স্ট্যান্ডার্ড ক্যাশ ও ব্লুটুথ থার্মাল রসিদ</p>
+              </button>
+
+              {/* Option 4: 58mm Slim POS */}
+              <button
+                onClick={() => {
+                  const target = formatPickerOrder;
+                  setFormatPickerOrder(null);
+                  handleDirectPrint(target, 'pos_58mm');
+                }}
+                className="p-3 bg-slate-50 hover:bg-emerald-50 dark:bg-slate-800/40 dark:hover:bg-emerald-950/40 border border-slate-200 hover:border-emerald-300 dark:border-slate-750 dark:hover:border-emerald-700 rounded-2xl text-left transition group space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-black text-xs text-slate-900 dark:text-white group-hover:text-emerald-600">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>৪. ৫৮ মিমি চিকন স্লিপ</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400">58mm Mini</span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">ছোট পকেট প্রিন্টারের চিকন মিনি রসিদ</p>
+              </button>
+
+              {/* Option 5: 4x6 Courier Label */}
+              <button
+                onClick={() => {
+                  const target = formatPickerOrder;
+                  setFormatPickerOrder(null);
+                  handleDirectPrint(target, 'shipping_label');
+                }}
+                className="sm:col-span-2 p-3 bg-slate-50 hover:bg-amber-50 dark:bg-slate-800/40 dark:hover:bg-amber-950/40 border border-slate-200 hover:border-amber-300 dark:border-slate-750 dark:hover:border-amber-700 rounded-2xl text-left transition group space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-black text-xs text-slate-900 dark:text-white group-hover:text-amber-600">
+                    <Truck className="w-3.5 h-3.5 text-amber-500" />
+                    <span>৫. ৪×৬ ইঞ্চি কুরিয়ার বারকোড স্টিকার (Gatepass)</span>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400">100×150mm</span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">পার্সেল বক্সে সাঁটানোর জন্য শিপিং লেবেল ও বারকোড</p>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-150 dark:border-slate-800">
+              <button
+                onClick={() => {
+                  const target = formatPickerOrder;
+                  setFormatPickerOrder(null);
+                  setSelectedOrder(target);
+                  setPreviewModalOpen(true);
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>প্রিভিউ মোডে দেখুন</span>
+              </button>
+
+              <button
+                onClick={() => setFormatPickerOrder(null)}
+                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+              >
+                বাতিল করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* FULLSCREEN / HIGH RESOLUTION SLIP PREVIEW MODAL */}
       {previewModalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col space-y-4 my-auto">
             
             {/* Modal Control Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-150 dark:border-slate-800 gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-3 border-b border-slate-150 dark:border-slate-800 gap-3">
               <div className="flex items-center space-x-2">
                 <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
                   <FileText className="w-5 h-5" />
@@ -861,34 +1119,50 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
               </div>
 
               {/* Format Switcher Pills */}
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+              <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                 <button
                   onClick={() => setPrintFormat('a4')}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition ${
-                    printFormat === 'a4' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500'
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition ${
+                    printFormat === 'a4' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  স্ট্যান্ডার্ড A4
+                  📄 A4 বড়
+                </button>
+                <button
+                  onClick={() => setPrintFormat('a5')}
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition ${
+                    printFormat === 'a5' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  📑 A5 হাফ
                 </button>
                 <button
                   onClick={() => setPrintFormat('pos_80mm')}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition ${
-                    printFormat === 'pos_80mm' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500'
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition ${
+                    printFormat === 'pos_80mm' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  80mm POS থার্মাল
+                  🧾 ৮০মিমি POS
+                </button>
+                <button
+                  onClick={() => setPrintFormat('pos_58mm')}
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition ${
+                    printFormat === 'pos_58mm' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🎟️ ৫৮মিমি চিকন
                 </button>
                 <button
                   onClick={() => setPrintFormat('shipping_label')}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition ${
-                    printFormat === 'shipping_label' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500'
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition ${
+                    printFormat === 'shipping_label' ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  কুরিয়ার গেটপাস (4x6)
+                  🏷️ ৪×৬ গেটপাস
                 </button>
                 <button
                   onClick={() => setPreviewModalOpen(false)}
-                  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 transition ml-2"
+                  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 transition ml-1"
                 >
                   ✕
                 </button>
@@ -1018,15 +1292,25 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                     </div>
                   </div>
 
-                  {/* Calculation Total & Verification QR */}
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end pt-2 border-t border-slate-200">
-                    <div className="sm:col-span-5 flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                      {qrCodeDataUrl && (
-                        <img src={qrCodeDataUrl} alt="Invoice QR" className="w-16 h-16 rounded-md border border-slate-300 shrink-0" />
-                      )}
-                      <div className="text-[10px] text-slate-500 space-y-0.5">
-                        <span className="font-black text-slate-900 uppercase block">অটো ডিজিটাল সিল ভেরিফিকেশন</span>
-                        <p>যেকোনো ডিভাইস থেকে কিউআর কোড স্ক্যান করে অনলাইন ডাটাবেজে এই চালানের সত্যতা যাচাই করা যাবে।</p>
+                  {/* Dual QR Codes (Verification + Google Maps Delivery Location) & Calculation Total */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-start pt-3 border-t-2 border-slate-900">
+                    <div className="sm:col-span-6 grid grid-cols-2 gap-3">
+                      {/* QR 1: Invoice Verification */}
+                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center text-center space-y-1">
+                        {qrCodeDataUrl && (
+                          <img src={qrCodeDataUrl} alt="Invoice QR" className="w-16 h-16 rounded border border-slate-300 shrink-0" />
+                        )}
+                        <span className="font-black text-slate-900 uppercase text-[9px] block">১. ইনভয়েস ভেরিফিকেশন</span>
+                        <p className="text-[8px] text-slate-500 leading-tight">চালানের সত্যতা যাচাই করুন</p>
+                      </div>
+
+                      {/* QR 2: Customer Delivery Map Location */}
+                      <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-200 flex flex-col items-center text-center space-y-1">
+                        {locationQrCodeDataUrl && (
+                          <img src={locationQrCodeDataUrl} alt="Location Map QR" className="w-16 h-16 rounded border border-blue-300 shrink-0" />
+                        )}
+                        <span className="font-black text-blue-900 uppercase text-[9px] block">২. ম্যাপ লোকেশন QR 📍</span>
+                        <p className="text-[8px] text-blue-700 leading-tight">গ্রাহকের গুগল ম্যাপ লোকেশন</p>
                       </div>
                     </div>
 
@@ -1067,10 +1351,85 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                 </div>
               )}
 
-              {/* FORMAT 2: 80MM / 58MM POS THERMAL RECEIPT */}
+              {/* FORMAT 2: COMPACT A5 HALF-PAGE INVOICE */}
+              {printFormat === 'a5' && (
+                <div 
+                  id="printable-slip-a5"
+                  className="bg-white text-slate-900 w-full max-w-[560px] p-5 rounded-xl shadow-md border border-slate-200 space-y-3.5 text-[11px] leading-relaxed"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-900 pb-2.5">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-7 h-7 bg-red-600 rounded flex items-center justify-center text-white font-black text-xs">আ</div>
+                      <div>
+                        <h3 className="font-black text-sm text-slate-950 leading-none">আমারবাজার বিডি</h3>
+                        <p className="text-[9px] text-slate-500 mt-0.5">A5 ডেলিভারি মেমো ও ক্যাশ চালান</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-black text-xs text-slate-950 block">#{selectedOrder.orderNumber || selectedOrder.order5DigitId || selectedOrder.id}</span>
+                      <span className="text-[9px] text-slate-500">{new Date(selectedOrder.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 p-2.5 bg-slate-50 rounded-lg text-[10px]">
+                    <div>
+                      <span className="font-bold text-slate-400 block uppercase">গ্রাহক:</span>
+                      <p className="font-black text-slate-900">{selectedOrder.customerName}</p>
+                      <p className="text-slate-600">{selectedOrder.customerPhone}</p>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-400 block uppercase">ডেলিভারি ঠিকানা:</span>
+                      <p className="text-slate-800 truncate">{selectedOrder.shippingAddress.fullAddress}</p>
+                      <p className="text-slate-600">{selectedOrder.shippingAddress.thana}, {selectedOrder.shippingAddress.district}</p>
+                    </div>
+                  </div>
+
+                  <table className="w-full text-left text-[10px] border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-900 bg-slate-100 font-bold uppercase">
+                        <th className="py-1.5 px-2">পণ্য</th>
+                        <th className="py-1.5 px-1 text-center">পরিমাণ</th>
+                        <th className="py-1.5 px-2 text-right">মূল্য</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {selectedOrder.items.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="py-1.5 px-2 font-bold">{it.productTitle}</td>
+                          <td className="py-1.5 px-1 text-center font-bold">{it.quantity}</td>
+                          <td className="py-1.5 px-2 text-right font-mono font-black">৳{(it.price * it.quantity).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="flex justify-between items-center pt-2.5 border-t border-slate-200 gap-2">
+                    <div className="flex items-center space-x-2">
+                      {qrCodeDataUrl && (
+                        <div className="text-center">
+                          <img src={qrCodeDataUrl} alt="Invoice QR" className="w-11 h-11 border border-slate-300 rounded" />
+                          <span className="text-[7px] font-bold block text-slate-600">ভেরিফিকেশন</span>
+                        </div>
+                      )}
+                      {locationQrCodeDataUrl && (
+                        <div className="text-center">
+                          <img src={locationQrCodeDataUrl} alt="Location QR" className="w-11 h-11 border border-blue-300 rounded" />
+                          <span className="text-[7px] font-bold block text-blue-700">ম্যাপ লোকেশন 📍</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right space-y-0.5 text-[11px]">
+                      <div className="text-slate-600 text-[10px]">ডেলিভারি চার্জ: ৳{selectedOrder.shippingFee}</div>
+                      <div className="font-black text-sm text-slate-950 font-mono">মোট: ৳{selectedOrder.totalAmount.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* FORMAT 3: 80MM POS THERMAL RECEIPT */}
               {printFormat === 'pos_80mm' && (
                 <div 
-                  id="printable-slip-pos"
+                  id="printable-slip-pos80"
                   className="bg-white text-slate-950 font-mono p-4 rounded-xl shadow-md border border-slate-300 w-full max-w-[360px] text-[11px] leading-tight space-y-3"
                 >
                   <div className="text-center space-y-1 pb-2 border-b border-dashed border-slate-900">
@@ -1078,7 +1437,7 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                     <p className="text-[10px]">Online E-Commerce Platform</p>
                     <p className="text-[9px]">Hotline: 09612-22927 | Dhaka, BD</p>
                     <p className="text-[10px] font-black uppercase mt-1 bg-slate-950 text-white px-2 py-0.5 rounded">
-                      {selectedOrder.status === 'cancelled' ? 'CANCELLATION SLIP' : 'POS SALES RECEIPT'}
+                      {selectedOrder.status === 'cancelled' ? 'CANCELLATION SLIP' : 'POS 80MM SALES RECEIPT'}
                     </p>
                   </div>
 
@@ -1098,6 +1457,9 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                     <div className="flex justify-between">
                       <span>PHONE:</span>
                       <span>{selectedOrder.customerPhone}</span>
+                    </div>
+                    <div className="text-[9px] text-slate-700 pt-0.5">
+                      <span className="font-bold">ADDR:</span> {selectedOrder.shippingAddress?.fullAddress}
                     </div>
                   </div>
 
@@ -1136,18 +1498,96 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                   </div>
 
                   <div className="border-t border-dashed border-slate-900 pt-2 text-center space-y-2">
-                    <div className="flex justify-center">
+                    <div className="flex justify-center items-center gap-3">
                       {qrCodeDataUrl && (
-                        <img src={qrCodeDataUrl} alt="POS QR" className="w-20 h-20" />
+                        <div className="flex flex-col items-center">
+                          <img src={qrCodeDataUrl} alt="POS QR" className="w-16 h-16" />
+                          <span className="text-[7.5px] font-bold uppercase mt-0.5">Invoice QR</span>
+                        </div>
+                      )}
+                      {locationQrCodeDataUrl && (
+                        <div className="flex flex-col items-center">
+                          <img src={locationQrCodeDataUrl} alt="Location QR" className="w-16 h-16 border border-blue-300 rounded" />
+                          <span className="text-[7.5px] font-bold uppercase text-blue-900 mt-0.5">Map Location 📍</span>
+                        </div>
                       )}
                     </div>
-                    <p className="text-[9px] uppercase">THANK YOU FOR SHOPPING AT AMARBAZAR</p>
+                    <p className="text-[9px] uppercase font-bold">THANK YOU FOR SHOPPING AT AMARBAZAR</p>
                     <p className="text-[8px] text-slate-500">*** www.amarbazar.bd ***</p>
                   </div>
                 </div>
               )}
 
-              {/* FORMAT 3: 4X6 COURIER SHIPPING LABEL / GATEPASS */}
+              {/* FORMAT 4: 58MM SLIM MINI POS THERMAL RECEIPT */}
+              {printFormat === 'pos_58mm' && (
+                <div 
+                  id="printable-slip-pos58"
+                  className="bg-white text-slate-950 font-mono p-3 rounded-xl shadow-md border border-slate-300 w-full max-w-[260px] text-[10px] leading-tight space-y-2"
+                >
+                  <div className="text-center space-y-0.5 pb-1.5 border-b border-dashed border-slate-900">
+                    <h4 className="font-black text-xs uppercase">AMARBAZAR BD</h4>
+                    <p className="text-[8px] font-bold">58MM MINI THERMAL SLIP</p>
+                    <p className="text-[8px]">09612-22927</p>
+                  </div>
+
+                  <div className="space-y-0.5 text-[9px]">
+                    <div className="flex justify-between">
+                      <span>ORD:</span>
+                      <span className="font-bold">#{selectedOrder.order5DigitId || selectedOrder.id.slice(-6)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>TEL:</span>
+                      <span>{selectedOrder.customerPhone}</span>
+                    </div>
+                    <div className="truncate text-slate-700">
+                      {selectedOrder.customerName}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-b border-dashed border-slate-900 py-1 space-y-1">
+                    {selectedOrder.items.map((it, i) => (
+                      <div key={i} className="text-[9px]">
+                        <div className="truncate font-bold">{it.productTitle}</div>
+                        <div className="flex justify-between text-slate-600">
+                          <span>{it.quantity} x ৳{it.price}</span>
+                          <span className="font-bold text-slate-950 font-mono">৳{it.price * it.quantity}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-0.5 text-right text-[10px] font-bold">
+                    <div className="flex justify-between">
+                      <span>DELIVERY:</span>
+                      <span>৳{selectedOrder.shippingFee}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black border-t border-slate-900 pt-0.5">
+                      <span>TOTAL:</span>
+                      <span>৳{selectedOrder.totalAmount}</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-slate-900 pt-1.5 text-center space-y-1">
+                    <div className="flex justify-center items-center gap-2">
+                      {qrCodeDataUrl && (
+                        <div className="flex flex-col items-center">
+                          <img src={qrCodeDataUrl} alt="Mini QR" className="w-12 h-12" />
+                          <span className="text-[7px] font-bold uppercase">Invoice</span>
+                        </div>
+                      )}
+                      {locationQrCodeDataUrl && (
+                        <div className="flex flex-col items-center">
+                          <img src={locationQrCodeDataUrl} alt="Map Location QR" className="w-12 h-12 border border-blue-300 rounded" />
+                          <span className="text-[7px] font-bold uppercase text-blue-900">Map 📍</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[8px] uppercase font-bold">THANK YOU</p>
+                  </div>
+                </div>
+              )}
+
+              {/* FORMAT 5: 4X6 COURIER SHIPPING LABEL / GATEPASS */}
               {printFormat === 'shipping_label' && (
                 <div 
                   id="printable-slip-label"
@@ -1187,16 +1627,27 @@ export const OrderSlipsHub: React.FC<OrderSlipsHubProps> = ({ initialSlipType = 
                     </div>
                   </div>
 
-                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex justify-between items-center">
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex justify-between items-center gap-2">
                     <div>
                       <span className="text-[9px] font-black uppercase text-amber-800">CASH ON DELIVERY (COD) COLLECTION:</span>
                       <h4 className="text-base font-black text-slate-950">
                         {selectedOrder.paymentStatus === 'paid' ? '৳0 (ALREADY PAID ONLINE)' : `৳${selectedOrder.totalAmount.toLocaleString()}`}
                       </h4>
                     </div>
-                    {qrCodeDataUrl && (
-                      <img src={qrCodeDataUrl} alt="QR" className="w-12 h-12" />
-                    )}
+                    <div className="flex items-center space-x-2 shrink-0">
+                      {qrCodeDataUrl && (
+                        <div className="text-center">
+                          <img src={qrCodeDataUrl} alt="Invoice QR" className="w-11 h-11 border border-slate-300 rounded" />
+                          <span className="text-[7px] font-bold text-slate-600 block">Invoice</span>
+                        </div>
+                      )}
+                      {locationQrCodeDataUrl && (
+                        <div className="text-center">
+                          <img src={locationQrCodeDataUrl} alt="Location Map QR" className="w-11 h-11 border border-blue-400 rounded" />
+                          <span className="text-[7px] font-bold text-blue-800 block">Map 📍</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

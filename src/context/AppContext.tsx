@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { User, Product, Category, CartItem, Order, Language, CurrencyCode, Role, SystemSettings, Notification, ColorPalette, getProductUnitPrice, getBulkDiscountedPrice } from '../types';
 import { INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SYSTEM_SETTINGS } from '../data/initialData';
-import { api } from '../services/api';
-import { supabaseDb } from '../lib/supabase';
+import { api, getDeletedProductIds } from '../services/api';
+import { firebaseDb } from '../lib/firebase';
+import { safeStorage } from '../lib/safeStorage';
 import { applyLiveLanguage } from '../services/languageService';
 import { applyLiveCurrency, formatCurrencyAmount } from '../services/currencyService';
 
@@ -42,10 +43,10 @@ interface AppContextType {
   toggleWishlist: (productId: string) => void;
   
   // Modals & Panels
-  activePanel: 'customer' | 'seller' | 'admin' | 'settings' | 'dashboard_home' | 'store_directory' | 'inventory_workspace' | 'product_reviews' | 'customer_messages' | 'register_vendor' | 'customer_profile' | 'outlets' | 'subscription_pricing';
-  setActivePanel: (panel: 'customer' | 'seller' | 'admin' | 'settings' | 'dashboard_home' | 'store_directory' | 'inventory_workspace' | 'product_reviews' | 'customer_messages' | 'register_vendor' | 'customer_profile' | 'outlets' | 'subscription_pricing') => void;
-  sellerActiveTab: 'overview' | 'products' | 'orders' | 'withdrawals' | 'roles_permissions' | 'settings' | 'subscription';
-  setSellerActiveTab: (tab: 'overview' | 'products' | 'orders' | 'withdrawals' | 'roles_permissions' | 'settings' | 'subscription') => void;
+  activePanel: 'customer' | 'seller' | 'admin' | 'settings' | 'dashboard_home' | 'store_directory' | 'inventory_workspace' | 'product_reviews' | 'customer_messages' | 'register_vendor' | 'customer_profile' | 'outlets' | 'subscription_pricing' | 'seller_applications' | 'product_approvals';
+  setActivePanel: (panel: 'customer' | 'seller' | 'admin' | 'settings' | 'dashboard_home' | 'store_directory' | 'inventory_workspace' | 'product_reviews' | 'customer_messages' | 'register_vendor' | 'customer_profile' | 'outlets' | 'subscription_pricing' | 'seller_applications' | 'product_approvals') => void;
+  sellerActiveTab: 'overview' | 'products' | 'orders' | 'withdrawals' | 'roles_permissions' | 'settings' | 'subscription' | 'store_directory' | 'inventory_manager';
+  setSellerActiveTab: (tab: 'overview' | 'products' | 'orders' | 'withdrawals' | 'roles_permissions' | 'settings' | 'subscription' | 'store_directory' | 'inventory_manager') => void;
   selectedProduct: Product | null;
   setSelectedProduct: (product: Product | null) => void;
   sharingProduct: Product | null;
@@ -75,6 +76,7 @@ interface AppContextType {
   refreshCategories: () => Promise<void>;
   deleteProduct: (id: string) => Promise<boolean>;
   createProduct: (product: Partial<Product>) => Promise<Product>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<Product>;
   
   // Dedicated customer-only marketplace mode
   isCustomerOnlyMode: boolean;
@@ -480,59 +482,42 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('currentUser');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
+    return safeStorage.getJSON<User | null>('currentUser', null);
   });
   const [activeRole, setActiveRole] = useState<Role>(() => {
-    const saved = localStorage.getItem('currentUser');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.role || 'customer';
-      } catch (e) {}
-    }
-    return 'customer';
+    const parsed = safeStorage.getJSON<any>('currentUser', null);
+    return parsed?.role || 'customer';
   });
   const [language, setLanguage] = useState<Language>(() => {
-    const saved = localStorage.getItem('language') as Language;
+    const saved = safeStorage.getItem('language') as Language;
     return saved ? saved : 'bn';
   });
   const [currency, setCurrency] = useState<CurrencyCode>(() => {
-    const saved = localStorage.getItem('app_currency') as CurrencyCode;
+    const saved = safeStorage.getItem('app_currency') as CurrencyCode;
     return saved ? saved : 'BDT';
   });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme');
+    const saved = safeStorage.getItem('theme');
     return saved === 'dark' ? 'dark' : 'light';
   });
   const [colorPalette, setColorPalette] = useState<ColorPalette>(() => {
-    const saved = localStorage.getItem('colorPalette') as ColorPalette;
+    const saved = safeStorage.getItem('colorPalette') as ColorPalette;
     return saved ? saved : 'amber';
   });
   const [customColorHex, setCustomColorHex] = useState<string>(() => {
-    return localStorage.getItem('customColorHex') || '#e11d48';
+    return safeStorage.getItem('customColorHex') || '#e11d48';
   });
-  const [activePanel, setActivePanel] = useState<'customer' | 'seller' | 'admin' | 'settings' | 'dashboard_home' | 'store_directory' | 'inventory_workspace' | 'product_reviews' | 'customer_messages' | 'register_vendor' | 'customer_profile' | 'outlets' | 'subscription_pricing'>(() => {
-    const saved = localStorage.getItem('currentUser');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.role === 'admin') return 'admin';
-        if (parsed.role === 'seller') return 'seller';
-        return 'customer';
-      } catch (e) {}
+  const [activePanel, setActivePanel] = useState<'customer' | 'seller' | 'admin' | 'settings' | 'dashboard_home' | 'store_directory' | 'inventory_workspace' | 'product_reviews' | 'customer_messages' | 'register_vendor' | 'customer_profile' | 'outlets' | 'subscription_pricing' | 'seller_applications' | 'product_approvals'>(() => {
+    const parsed = safeStorage.getJSON<any>('currentUser', null);
+    if (parsed) {
+      if (parsed.role === 'admin') return 'admin';
+      if (parsed.role === 'seller') return 'seller';
+      return 'customer';
     }
     return 'customer';
   });
 
-  const [sellerActiveTab, setSellerActiveTab] = useState<'overview' | 'products' | 'orders' | 'withdrawals' | 'roles_permissions' | 'settings' | 'subscription'>('overview');
+  const [sellerActiveTab, setSellerActiveTab] = useState<'overview' | 'products' | 'orders' | 'withdrawals' | 'roles_permissions' | 'settings' | 'subscription' | 'store_directory' | 'inventory_manager'>('overview');
 
   const [isCustomerOnlyMode, setIsCustomerOnlyMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -550,7 +535,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [isCustomerOnlyMode]);
 
   useEffect(() => {
-    localStorage.setItem('language', language);
+    safeStorage.setItem('language', language);
     applyLiveLanguage(language);
   }, [language]);
 
@@ -563,10 +548,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    localStorage.setItem('theme', theme);
+    safeStorage.setItem('theme', theme);
   }, [theme]);
 
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>(() => {
+    const deletedSet = getDeletedProductIds();
+    try {
+      const parsed = safeStorage.getJSON<Product[]>('amarbazar_products_store', []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(p => !deletedSet.has(p.id));
+      }
+    } catch (e) {}
+    return INITIAL_PRODUCTS.filter(p => !deletedSet.has(p.id));
+  });
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>(['prod-102']);
@@ -628,8 +622,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshProducts = async () => {
     try {
       const data = await api.getProducts();
-      if (data && Array.isArray(data) && data.length > 0) {
-        setProducts(data);
+      if (data && Array.isArray(data)) {
+        const deletedSet = getDeletedProductIds();
+        setProducts(data.filter(p => !deletedSet.has(p.id)));
       }
     } catch (e) {
       console.log('Using local products fallback');
@@ -639,7 +634,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteProduct = async (id: string): Promise<boolean> => {
     // 1. Instantly remove from React memory state
     setProducts(prev => prev.filter(p => p.id !== id));
-    // 2. Persist in api / local storage / backend
+    // 2. Persist in api / local storage / Firebase Firestore / backend
     try {
       await api.deleteProduct(id);
       return true;
@@ -653,17 +648,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const created = await api.createProduct(productData);
       setProducts(prev => [created, ...prev.filter(p => p.id !== created.id)]);
-      api.getProducts().then(fresh => {
-        if (fresh && fresh.length > 0) {
-          setProducts(prev => {
-            const hasCreated = fresh.some(p => p.id === created.id);
-            return hasCreated ? fresh : [created, ...fresh.filter(p => p.id !== created.id)];
-          });
-        }
-      }).catch(() => {});
       return created;
     } catch (err) {
       console.error('Error creating product:', err);
+      throw err;
+    }
+  };
+
+  const updateProduct = async (id: string, productData: Partial<Product>): Promise<Product> => {
+    try {
+      const updated = await api.updateProduct(id, productData);
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+      return updated;
+    } catch (err) {
+      console.error('Error updating product:', err);
       throw err;
     }
   };
@@ -703,39 +701,176 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshCategories();
     refreshSystemSettings();
 
-    // 1. Supabase Realtime Subscriptions for live multi-device syncing
-    const unsubProducts = supabaseDb.subscribeToProducts(() => {
-      refreshProducts();
-    });
-    const unsubSellers = supabaseDb.subscribeToSellers(() => {
-      refreshCategories();
-      refreshProducts();
-    });
+    // 1. Live Server-Sent Events (SSE) stream for instant zero-latency multi-device broadcast
+    let eventSource: EventSource | null = null;
+    try {
+      if (typeof window !== 'undefined' && 'EventSource' in window) {
+        eventSource = new EventSource('/api/events');
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'product_deleted' && data.id) {
+              const localSet = getDeletedProductIds();
+              localSet.add(data.id);
+              safeStorage.setItem('amarbazar_deleted_product_ids', JSON.stringify(Array.from(localSet)));
+              setProducts(prev => prev.filter(p => p.id !== data.id));
+              try {
+                const stored = safeStorage.getJSON<Product[]>('amarbazar_products_store', []);
+                if (Array.isArray(stored)) {
+                  safeStorage.setItem('amarbazar_products_store', JSON.stringify(stored.filter(p => p.id !== data.id)));
+                }
+              } catch (e) {}
+            } else if (data.type === 'product_created' && data.product) {
+              const localSet = getDeletedProductIds();
+              if (!localSet.has(data.product.id)) {
+                setProducts(prev => [data.product, ...prev.filter(p => p.id !== data.product.id)]);
+              }
+            } else if (data.type === 'product_updated' && data.product) {
+              const localSet = getDeletedProductIds();
+              if (!localSet.has(data.product.id)) {
+                setProducts(prev => prev.map(p => p.id === data.product.id ? { ...p, ...data.product } : p));
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors on ping
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('SSE connection notice:', e);
+    }
 
-    // 2. Periodic background sync (every 3 seconds) across all open phones and laptops
+    // 2. Real-time Firebase Firestore deleted products listener (Instant deletion across all devices)
+    let unsubscribeDeletedProducts: (() => void) | null = null;
+    try {
+      unsubscribeDeletedProducts = firebaseDb.subscribeToDeletedProducts((cloudDeletedIds) => {
+        if (cloudDeletedIds && Array.isArray(cloudDeletedIds) && cloudDeletedIds.length > 0) {
+          const localSet = getDeletedProductIds();
+          let hasNew = false;
+          cloudDeletedIds.forEach(id => {
+            if (!localSet.has(id)) {
+              localSet.add(id);
+              hasNew = true;
+            }
+          });
+          if (hasNew) {
+            safeStorage.setItem('amarbazar_deleted_product_ids', JSON.stringify(Array.from(localSet)));
+            setProducts(prev => prev.filter(p => !localSet.has(p.id)));
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Firebase deleted products listener notice:', e);
+    }
+
+    // 3. Real-time Firebase Firestore products listener
+    let unsubscribeProducts: (() => void) | null = null;
+    try {
+      unsubscribeProducts = firebaseDb.subscribeToProducts((fbProds) => {
+        if (fbProds && Array.isArray(fbProds) && fbProds.length > 0) {
+          const deletedSet = getDeletedProductIds();
+          const liveList = fbProds.filter(p => !deletedSet.has(p.id));
+          setProducts(liveList);
+          try {
+            safeStorage.setItem('amarbazar_products_store', JSON.stringify(liveList));
+          } catch (e) {}
+        }
+      });
+    } catch (e) {
+      console.warn('Firebase real-time subscription error:', e);
+    }
+
+    // 4. Real-time Firebase Firestore categories listener
+    let unsubscribeCategories: (() => void) | null = null;
+    try {
+      unsubscribeCategories = firebaseDb.subscribeToCategories((fbCats) => {
+        if (fbCats && Array.isArray(fbCats) && fbCats.length > 0) {
+          setCategories(fbCats);
+          try {
+            safeStorage.setItem('amarbazar_categories_store', JSON.stringify(fbCats));
+          } catch (e) {}
+        }
+      });
+    } catch (e) {}
+
+    // 5. Real-time Firebase Firestore settings listener
+    let unsubscribeSettings: (() => void) | null = null;
+    try {
+      unsubscribeSettings = firebaseDb.subscribeToSettings((fbSettings) => {
+        if (fbSettings) {
+          setSystemSettings(fbSettings);
+        }
+      });
+    } catch (e) {}
+
+    // 6. Fast polling fallback (every 4 seconds) to guarantee instant multi-device reflection
     const interval = setInterval(() => {
       refreshProducts();
       refreshCategories();
-    }, 3000);
+    }, 4000);
 
-    // 3. Sync immediately on tab focus, visibility change, storage change, pageshow or reconnection
+    // 7. Sync on tab focus, visibility change, online status with safety debounce
+    let lastSyncTime = 0;
     const handleSync = () => {
+      const now = Date.now();
+      if (now - lastSyncTime < 1500) return;
+      lastSyncTime = now;
       refreshProducts();
       refreshCategories();
       refreshSystemSettings();
     };
+
+    const handleProductsUpdated = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        const deletedSet = getDeletedProductIds();
+        setProducts(e.detail.filter((p: Product) => !deletedSet.has(p.id)));
+      }
+    };
+
+    const handleProductDeletedEvent = (e: any) => {
+      if (e?.detail?.id) {
+        const deletedId = e.detail.id;
+        setProducts(prev => prev.filter(p => p.id !== deletedId));
+      }
+    };
+
     window.addEventListener('focus', handleSync);
-    window.addEventListener('storage', handleSync);
+    window.addEventListener('amarbazar_products_updated', handleProductsUpdated);
+    window.addEventListener('amarbazar_product_deleted', handleProductDeletedEvent);
     window.addEventListener('pageshow', handleSync);
     window.addEventListener('online', handleSync);
     document.addEventListener('visibilitychange', handleSync);
 
     return () => {
-      unsubProducts();
-      unsubSellers();
+      if (eventSource) {
+        try {
+          eventSource.close();
+        } catch (e) {}
+      }
+      if (unsubscribeDeletedProducts) {
+        try {
+          unsubscribeDeletedProducts();
+        } catch (e) {}
+      }
+      if (unsubscribeProducts) {
+        try {
+          unsubscribeProducts();
+        } catch (e) {}
+      }
+      if (unsubscribeCategories) {
+        try {
+          unsubscribeCategories();
+        } catch (e) {}
+      }
+      if (unsubscribeSettings) {
+        try {
+          unsubscribeSettings();
+        } catch (e) {}
+      }
       clearInterval(interval);
       window.removeEventListener('focus', handleSync);
-      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('amarbazar_products_updated', handleProductsUpdated);
+      window.removeEventListener('amarbazar_product_deleted', handleProductDeletedEvent);
       window.removeEventListener('pageshow', handleSync);
       window.removeEventListener('online', handleSync);
       document.removeEventListener('visibilitychange', handleSync);
@@ -748,11 +883,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (currentUser) {
       setActiveRole(currentUser.role);
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      safeStorage.setItem('currentUser', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('currentUser');
+      safeStorage.removeItem('currentUser');
       setActiveRole('customer');
       setActivePanel('customer');
+      setSelectedSellerId(null);
       if (prevUserRef.current !== null) {
         setIsAuthOpen(true);
       }
@@ -773,8 +909,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Handle Color Palette dynamic variable binding
   useEffect(() => {
-    localStorage.setItem('colorPalette', colorPalette);
-    localStorage.setItem('customColorHex', customColorHex);
+    safeStorage.setItem('colorPalette', colorPalette);
+    safeStorage.setItem('customColorHex', customColorHex);
     let shades: Record<string, string>;
     if (colorPalette === 'custom') {
       shades = generateShadesFromHex(customColorHex);
@@ -905,6 +1041,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshCategories,
       deleteProduct,
       createProduct,
+      updateProduct,
       isCustomerOnlyMode,
       setIsCustomerOnlyMode,
       isMobileChatActive,

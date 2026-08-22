@@ -1,0 +1,165 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Marketplace product item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 255 },
+        "titleBn": { "type": "string", "maxLength": 255 },
+        "slug": { "type": "string", "maxLength": 255 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "descriptionBn": { "type": "string", "maxLength": 5000 },
+        "price": { "type": "number" },
+        "discountPrice": { "type": "number" },
+        "categoryId": { "type": "string", "maxLength": 128 },
+        "categoryName": { "type": "string", "maxLength": 128 },
+        "subCategory": { "type": "string", "maxLength": 128 },
+        "brand": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "sellerName": { "type": "string", "maxLength": 128 },
+        "stock": { "type": "number" },
+        "sku": { "type": "string", "maxLength": 64 },
+        "images": { "type": "array" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "tags": { "type": "array" },
+        "isFeatured": { "type": "boolean" },
+        "isFlashDeal": { "type": "boolean" },
+        "isCombo": { "type": "boolean" },
+        "comboItems": { "type": "array" },
+        "variants": { "type": "array" },
+        "variantPrices": { "type": "object" },
+        "bulkOffers": { "type": "array" },
+        "warranty": { "type": "string", "maxLength": 255 },
+        "customSpecs": { "type": "array" },
+        "isApproved": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "price", "sellerId"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "nameBn": { "type": "string", "maxLength": 128 },
+        "icon": { "type": "string", "maxLength": 64 },
+        "image": { "type": "string", "maxLength": 1000 },
+        "subcategories": { "type": "array" },
+        "productCount": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "SellerStore": {
+      "title": "SellerStore",
+      "description": "Merchant vendor shop details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "storeName": { "type": "string", "maxLength": 255 },
+        "storeNameBn": { "type": "string", "maxLength": 255 },
+        "ownerName": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "logoUrl": { "type": "string", "maxLength": 1000 },
+        "bannerUrl": { "type": "string", "maxLength": 1000 },
+        "rating": { "type": "number" },
+        "totalSales": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "status": { "type": "string", "maxLength": 64 },
+        "subscriptionTier": { "type": "string", "maxLength": 64 },
+        "subscriptionStatus": { "type": "string", "maxLength": 64 },
+        "subscriptionExpiryDate": { "type": "string", "maxLength": 64 },
+        "cloudSubscriptionPlan": { "type": "string", "maxLength": 128 },
+        "storageType": { "type": "string", "maxLength": 64 },
+        "storageCredentials": { "type": "string", "maxLength": 5000 },
+        "tradeLicenseNumber": { "type": "string", "maxLength": 128 },
+        "bkashNumber": { "type": "string", "maxLength": 64 },
+        "bankAccountDetails": { "type": "string", "maxLength": 500 },
+        "staff": { "type": "array" },
+        "permissionsConfig": { "type": "object" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "storeName"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "orderNumber": { "type": "string", "maxLength": 128 },
+        "order5DigitId": { "type": "string", "maxLength": 32 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 128 },
+        "customerPhone": { "type": "string", "maxLength": 64 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "couponCode": { "type": "string", "maxLength": 64 },
+        "shippingFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "maxLength": 64 },
+        "paymentStatus": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "maxLength": 64 },
+        "trackingStatus": { "type": "string", "maxLength": 128 },
+        "courier": { "type": "object" },
+        "shippingAddress": { "type": "object" },
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "totalAmount"]
+    },
+    "SystemSetting": {
+      "title": "SystemSetting",
+      "description": "Global marketplace system configurations",
+      "type": "object",
+      "properties": {
+        "siteName": { "type": "string", "maxLength": 128 },
+        "siteNameBn": { "type": "string", "maxLength": 128 },
+        "supportPhone": { "type": "string", "maxLength": 64 },
+        "supportEmail": { "type": "string", "maxLength": 128 },
+        "insideDhakaShippingFee": { "type": "number" },
+        "outsideDhakaShippingFee": { "type": "number" },
+        "commissionPercentage": { "type": "number" },
+        "isMaintenanceMode": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Catalog of all marketplace products"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Marketplace product categories"
+    },
+    "/sellers/{sellerId}": {
+      "schema": "SellerStore",
+      "description": "Merchant vendor store profiles"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer purchase orders"
+    },
+    "/settings/{settingId}": {
+      "schema": "SystemSetting",
+      "description": "Platform settings document"
+    },
+    "/deleted_products/{productId}": {
+      "schema": "object",
+      "description": "Log of permanently deleted product IDs for multi-device real-time sync"
+    },
+    "/deleted_categories/{categoryId}": {
+      "schema": "object",
+      "description": "Log of permanently deleted category IDs for multi-device real-time sync"
+    }
+  }
+}

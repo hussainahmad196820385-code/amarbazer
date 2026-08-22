@@ -443,7 +443,9 @@ export const AdminRolesPermissions: React.FC = () => {
                               {seller.storeName}
                             </h3>
                             {perms.verifiedBadge && (
-                              <BadgeCheck className="w-4 h-4 text-sky-500 shrink-0" title="Verified Store" />
+                              <span title="Verified Store">
+                                <BadgeCheck className="w-4 h-4 text-sky-500 shrink-0" />
+                              </span>
                             )}
                           </div>
                           <p className="text-[11px] text-slate-400 font-medium">

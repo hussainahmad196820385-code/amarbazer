@@ -6,7 +6,7 @@ import {
   Smartphone, Map, HelpCircle, MessageSquare, ThumbsUp, Share2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Product } from '../../types';
+import { Product, Language } from '../../types';
 import { SHWAPNO_DETAILED_CATEGORIES, MainCategory, SubCategory, SubSubCategory } from '../../data/categoriesData';
 
 interface CustomerViewProps {
@@ -88,7 +88,7 @@ const CAMPAIGN_BANNERS = {
 interface CampaignTimerProps {
   campaign: any;
   campaignKey: string;
-  language: 'en' | 'bn';
+  language: Language;
 }
 
 const CampaignTimer: React.FC<CampaignTimerProps> = ({ campaign, campaignKey, language }) => {

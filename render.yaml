@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: amarbazar-web
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: amarbazer-519c5
